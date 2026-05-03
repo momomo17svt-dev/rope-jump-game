@@ -1,0 +1,28 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Expo
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Go
+backend/bin/
+*.exe
+*.test
+
+# OS
+.DS_Store
+Thumbs.db
