@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore } from '@/db/database';
@@ -42,28 +42,29 @@ export default function TitleScreen() {
     return <View style={styles.container} />;
   }
 
+  if (showSetup) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.modalBox}>
+          <Text style={styles.modalTitle}>プレイヤー名を入力してください</Text>
+          <TextInput
+            style={styles.input}
+            value={userName}
+            onChangeText={setUserName}
+            placeholder="1〜12文字"
+            placeholderTextColor="#888"
+            maxLength={12}
+          />
+          <TouchableOpacity style={styles.primaryButton} onPress={handleSaveUser}>
+            <Text style={styles.buttonText}>決定</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Modal visible={showSetup} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>プレイヤー名を入力してください</Text>
-            <TextInput
-              style={styles.input}
-              value={userName}
-              onChangeText={setUserName}
-              placeholder="1〜12文字"
-              placeholderTextColor="#888"
-              maxLength={12}
-              autoFocus
-            />
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSaveUser}>
-              <Text style={styles.buttonText}>決定</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       <Text style={styles.title}>大縄跳びサバイバル</Text>
 
       {bestScore !== null && (
@@ -119,12 +120,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#aaaacc',
     fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalBox: {
     backgroundColor: '#2a2a4e',
