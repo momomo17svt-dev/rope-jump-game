@@ -20,16 +20,11 @@
 
 ### フロントエンド（モバイルアプリ）
 
-> **2026-05-04 方針転換:** React Native (Expo) から Unity (C#) へ移行。
-
 | 項目 | 内容 |
 | :--- | :--- |
-| フレームワーク | Unity（2D Built-In RP）+ C# |
-| 推奨 Unity バージョン | 2022 LTS または 6 LTS |
+| フレームワーク | React Native (Expo Go) |
 | 画面の向き | ランドスケープ（横画面）固定 |
-| ローカルデータ管理 | SQLite（`sqlite-net-pcl`、NuGetForUnity 経由） |
-| iOS ビルド | Unity Cloud Build |
-| Android ビルド | Unity Editor（Windows）からローカルビルド |
+| ローカルデータ管理 | Expo SQLite |
 
 ### バックエンド（ランキングAPI）
 
@@ -103,7 +98,7 @@
 
 ## 4. データモデル設計
 
-### 4.1 ローカルデータベース（SQLite, Unity 側で `sqlite-net-pcl`）
+### 4.1 ローカルデータベース（Expo SQLite）
 
 #### `local_user` テーブル（プレイヤー情報）
 
