@@ -80,20 +80,26 @@
 ## Phase 4: 設定機能
 
 ### 4-1. DB拡張
-- [ ] `local_user` に `avatar_stand_uri` / `avatar_jump_uri` カラムを追加（マイグレーション対応）
-- [ ] `updateUserName` / `updateAvatarUris` / `getLocalUser`（拡張版）関数を追加
+- [x] `local_user` に `avatar_stand_uri` / `avatar_jump_uri` カラムを追加（マイグレーション対応）
+- [x] `updateUserName` / `updateAvatarUris` / `getLocalUser`（拡張版）関数を追加
 
 ### 4-2. 設定画面
-- [ ] `app/settings.tsx` の新規作成
-- [ ] ユーザー名変更UI（バリデーション・保存）
-- [ ] 「立ち」アバター変更UI（expo-image-picker・プレビュー・デフォルト戻し）
-- [ ] 「ジャンプ」アバター変更UI（同上）
+- [x] `app/settings.tsx` の新規作成
+- [x] ユーザー名変更UI（バリデーション・重複チェック・保存）
+- [x] 「立ち」アバター変更UI（expo-image-picker・プレビュー・デフォルト戻し）
+- [x] 「ジャンプ」アバター変更UI（同上）
 
 ### 4-3. タイトル画面
-- [ ] 右上に設定アイコンボタンを追加
+- [x] 右上に設定アイコンボタンを追加
 
 ### 4-4. ゲーム画面
-- [ ] アバターURIをDBから読み込みプレイヤー画像に反映（正方形表示・フォールバックあり）
+- [x] アバターURIをDBから読み込みプレイヤー画像に反映（正方形表示・フォールバックあり）
+
+### 4-5. バックエンド改善
+- [x] POST /api/scores を INSERT → UPSERT に修正（device_id キーで1行管理）
+- [x] GET /api/check-username で重複チェックエンドポイント追加
+- [x] PATCH /api/profile でユーザー名のみ更新（last_played_at を変えない）
+- [x] score_history テーブルを追加し週間ランキングを「今週内ベスト」に変更
 
 ---
 
