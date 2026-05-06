@@ -59,7 +59,7 @@
 - [x] ヘルスチェックエンドポイント（`GET /health`）
 
 ### 2-4. デプロイ
-- [ ] Render Web Service + Neon へのデプロイと動作確認
+- [x] Render Web Service + Neon へのデプロイと動作確認
 
 ---
 
