@@ -29,8 +29,16 @@ ORDER BY score DESC, created_at ASC
 LIMIT $1
 `
 
-func TopRankings(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Ranking, error) {
-	rows, err := pool.Query(ctx, topRankingsSQL, limit)
+const topWeeklyRankingsSQL = `
+SELECT user_name, score
+FROM global_rankings
+WHERE created_at >= NOW() - INTERVAL '7 days'
+ORDER BY score DESC, created_at ASC
+LIMIT $1
+`
+
+func queryRankings(ctx context.Context, pool *pgxpool.Pool, sql string, limit int) ([]Ranking, error) {
+	rows, err := pool.Query(ctx, sql, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -48,4 +56,12 @@ func TopRankings(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Ranking,
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+func TopRankings(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Ranking, error) {
+	return queryRankings(ctx, pool, topRankingsSQL, limit)
+}
+
+func TopWeeklyRankings(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Ranking, error) {
+	return queryRankings(ctx, pool, topWeeklyRankingsSQL, limit)
 }

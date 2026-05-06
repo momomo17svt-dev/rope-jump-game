@@ -131,7 +131,15 @@ func validateScoreRequest(req postScoreRequest) string {
 
 func getRankingsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rankings, err := db.TopRankings(r.Context(), pool, rankingLimit)
+		var (
+			rankings []db.Ranking
+			err      error
+		)
+		if r.URL.Query().Get("period") == "weekly" {
+			rankings, err = db.TopWeeklyRankings(r.Context(), pool, rankingLimit)
+		} else {
+			rankings, err = db.TopRankings(r.Context(), pool, rankingLimit)
+		}
 		if err != nil {
 			log.Printf("query error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")

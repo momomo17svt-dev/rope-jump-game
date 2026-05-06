@@ -11,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { getLocalUser } from '@/db/database';
 
+type Period = 'all' | 'weekly';
+
 type RankingEntry = {
   rank: number;
   user_name: string;
@@ -21,19 +23,20 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 export default function RankingScreen() {
   const router = useRouter();
+  const [period, setPeriod] = useState<Period>('all');
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [myUserName, setMyUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const fetchRankings = useCallback(async () => {
+  const fetchRankings = useCallback(async (p: Period) => {
     setLoading(true);
     setError(false);
     try {
-      const [user, res] = await Promise.all([
-        getLocalUser(),
-        fetch(`${API_BASE}/api/rankings`),
-      ]);
+      const url = p === 'weekly'
+        ? `${API_BASE}/api/rankings?period=weekly`
+        : `${API_BASE}/api/rankings`;
+      const [user, res] = await Promise.all([getLocalUser(), fetch(url)]);
       if (!res.ok) throw new Error('fetch failed');
       const data: RankingEntry[] = await res.json();
       setMyUserName(user?.user_name ?? null);
@@ -46,8 +49,8 @@ export default function RankingScreen() {
   }, []);
 
   useEffect(() => {
-    fetchRankings();
-  }, [fetchRankings]);
+    fetchRankings(period);
+  }, [fetchRankings, period]);
 
   const renderItem = ({ item }: { item: RankingEntry }) => {
     const isMe = myUserName !== null && item.user_name === myUserName;
@@ -77,6 +80,21 @@ export default function RankingScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, period === 'all' && styles.tabActive]}
+          onPress={() => setPeriod('all')}
+        >
+          <Text style={[styles.tabText, period === 'all' && styles.tabTextActive]}>全体</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, period === 'weekly' && styles.tabActive]}
+          onPress={() => setPeriod('weekly')}
+        >
+          <Text style={[styles.tabText, period === 'weekly' && styles.tabTextActive]}>週間</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.tableHeader}>
         <Text style={[styles.headerCell, styles.rankCell]}>順位</Text>
         <Text style={[styles.headerCell, styles.nameCell]}>プレイヤー</Text>
@@ -90,7 +108,7 @@ export default function RankingScreen() {
       ) : error ? (
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>データを取得できませんでした</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchRankings}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchRankings(period)}>
             <Text style={styles.retryButtonText}>再試行</Text>
           </TouchableOpacity>
         </View>
@@ -139,6 +157,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    gap: 8,
+  },
+  tab: {
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4a4a6e',
+  },
+  tabActive: {
+    backgroundColor: '#4a90d9',
+    borderColor: '#4a90d9',
+  },
+  tabText: {
+    color: '#aaaacc',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  tabTextActive: {
+    color: '#fff',
   },
   tableHeader: {
     flexDirection: 'row',
