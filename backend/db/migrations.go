@@ -7,14 +7,16 @@ import (
 )
 
 const schemaSQL = `
-CREATE TABLE IF NOT EXISTS global_rankings (
-    device_id  TEXT PRIMARY KEY,
+DROP TABLE IF EXISTS global_rankings;
+CREATE TABLE global_rankings (
+    id         BIGSERIAL PRIMARY KEY,
+    device_id  TEXT NOT NULL,
     user_name  TEXT NOT NULL,
     score      INTEGER NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_global_rankings_score_desc
-    ON global_rankings (score DESC, updated_at ASC);
+    ON global_rankings (score DESC, created_at ASC);
 `
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {

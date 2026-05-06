@@ -106,7 +106,7 @@ func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := db.UpsertScore(r.Context(), pool, req.DeviceID, req.UserName, req.Score); err != nil {
+		if err := db.InsertScore(r.Context(), pool, req.DeviceID, req.UserName, req.Score); err != nil {
 			log.Printf("upsert error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")
 			return

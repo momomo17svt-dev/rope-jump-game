@@ -12,24 +12,20 @@ type Ranking struct {
 	Score    int    `json:"score"`
 }
 
-const upsertSQL = `
-INSERT INTO global_rankings (device_id, user_name, score, updated_at)
+const insertSQL = `
+INSERT INTO global_rankings (device_id, user_name, score, created_at)
 VALUES ($1, $2, $3, NOW())
-ON CONFLICT (device_id) DO UPDATE
-SET user_name  = EXCLUDED.user_name,
-    score      = GREATEST(global_rankings.score, EXCLUDED.score),
-    updated_at = NOW()
 `
 
-func UpsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
-	_, err := pool.Exec(ctx, upsertSQL, deviceID, userName, score)
+func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
+	_, err := pool.Exec(ctx, insertSQL, deviceID, userName, score)
 	return err
 }
 
 const topRankingsSQL = `
 SELECT user_name, score
 FROM global_rankings
-ORDER BY score DESC, updated_at ASC
+ORDER BY score DESC, created_at ASC
 LIMIT $1
 `
 
