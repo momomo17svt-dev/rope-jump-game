@@ -160,7 +160,7 @@ export default function GameScreen() {
   const rightSwingerBodyX = rightSwingerHandX - 40;
   const playerX = W / 2;
 
-  const { playJump, playGameover } = useGameSounds();
+  const { playJump, playGameover, startPlayBGM, stopPlayBGM } = useGameSounds();
 
   const [gameState, setGameState] = useState<GameState>('countdown');
   const [countdownLabel, setCountdownLabel] = useState<string>('3');
@@ -192,6 +192,10 @@ export default function GameScreen() {
       }
     }, 50);
     return () => clearInterval(interval);
+  }, [gameState]);
+
+  useEffect(() => {
+    if (gameState === 'playing') startPlayBGM();
   }, [gameState]);
 
   useEffect(() => {
@@ -251,6 +255,7 @@ export default function GameScreen() {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    stopPlayBGM();
     playGameover();
     setGameState('gameover');
     const finalScore = scoreRef.current;

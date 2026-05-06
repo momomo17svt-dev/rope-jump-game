@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
+import { useTopBGM } from '@/hooks/useTopBGM';
 
 export default function TitleScreen() {
   const router = useRouter();
@@ -10,6 +11,15 @@ export default function TitleScreen() {
   const [userName, setUserName] = useState('');
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+
+  const { start: startBGM, stop: stopBGM } = useTopBGM();
+
+  useFocusEffect(
+    useCallback(() => {
+      startBGM();
+      return () => stopBGM();
+    }, [])
+  );
 
   useEffect(() => {
     (async () => {
@@ -71,11 +81,11 @@ export default function TitleScreen() {
         <Text style={styles.bestScore}>自己ベスト: {bestScore} 回</Text>
       )}
 
-      <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/game')}>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => { stopBGM(); router.push('/game'); }}>
         <Text style={styles.buttonText}>TAP TO START</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => { stopBGM(); router.push('/ranking'); }}>
         <Text style={styles.secondaryButtonText}>ランキングを見る</Text>
       </TouchableOpacity>
 
