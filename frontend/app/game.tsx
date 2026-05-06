@@ -253,7 +253,10 @@ export default function GameScreen() {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     playGameover();
     setGameState('gameover');
-    router.replace({ pathname: '/result', params: { score: String(scoreRef.current) } });
+    const finalScore = scoreRef.current;
+    setTimeout(() => {
+      router.replace({ pathname: '/result', params: { score: String(finalScore) } });
+    }, 600);
   };
 
   const handleTap = () => {
