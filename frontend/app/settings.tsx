@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { getLocalUser, updateUserName, updateAvatarUris, getBestScore } from '@/db/database';
+import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
@@ -13,6 +13,9 @@ export default function SettingsScreen() {
   const [standUri, setStandUri] = useState<string | null>(null);
   const [jumpUri, setJumpUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [permissionMsg, setPermissionMsg] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -26,9 +29,10 @@ export default function SettingsScreen() {
   }, []);
 
   const pickImage = async (type: 'stand' | 'jump') => {
+    setPermissionMsg('');
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('権限が必要です', 'カメラロールへのアクセスを許可してください');
+      setPermissionMsg('カメラロールへのアクセスを許可してください');
       return;
     }
 
@@ -57,9 +61,11 @@ export default function SettingsScreen() {
   };
 
   const saveAll = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
     const trimmed = userName.trim();
     if (trimmed.length < 1 || trimmed.length > 12) {
-      Alert.alert('エラー', 'プレイヤー名は1〜12文字で入力してください');
+      setErrorMsg('プレイヤー名は1〜12文字で入力してください');
       return;
     }
     setSaving(true);
@@ -75,7 +81,7 @@ export default function SettingsScreen() {
           if (res.ok) {
             const { available } = await res.json();
             if (!available) {
-              Alert.alert('エラー', 'このユーザー名はすでに使われています');
+              setErrorMsg('このユーザー名はすでに使われています');
               return;
             }
           }
@@ -96,7 +102,8 @@ export default function SettingsScreen() {
         }).catch(() => {});
       }
 
-      Alert.alert('保存しました', '', [{ text: 'OK', onPress: () => router.back() }]);
+      setSuccessMsg('保存しました');
+      setTimeout(() => router.back(), 800);
     } finally {
       setSaving(false);
     }
@@ -117,11 +124,12 @@ export default function SettingsScreen() {
         <TextInput
           style={styles.input}
           value={userName}
-          onChangeText={setUserName}
+          onChangeText={(v) => { setUserName(v); setErrorMsg(''); }}
           placeholder="1〜12文字"
           placeholderTextColor="#888"
           maxLength={12}
         />
+        {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
       </View>
 
       {/* 立ちアバター */}
@@ -166,11 +174,18 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        {permissionMsg !== '' && <Text style={styles.errorText}>{permissionMsg}</Text>}
       </View>
 
       {/* 保存 */}
-      <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={saveAll} disabled={saving}>
-        <Text style={styles.saveButtonText}>{saving ? '保存中...' : '保存する'}</Text>
+      <TouchableOpacity
+        style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
+        onPress={saveAll}
+        disabled={saving || successMsg !== ''}
+      >
+        <Text style={styles.saveButtonText}>
+          {successMsg !== '' ? successMsg : saving ? '保存中...' : '保存する'}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -217,6 +232,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 18,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 13,
+    marginTop: 6,
   },
   avatarRow: {
     flexDirection: 'row',

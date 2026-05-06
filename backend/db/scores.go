@@ -39,6 +39,15 @@ func InsertScoreHistory(ctx context.Context, pool *pgxpool.Pool, deviceID string
 	return err
 }
 
+// データリセット: device_id に紐づくランキングデータをすべて削除
+func DeleteProfile(ctx context.Context, pool *pgxpool.Pool, deviceID string) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM score_history WHERE device_id = $1`, deviceID); err != nil {
+		return err
+	}
+	_, err := pool.Exec(ctx, `DELETE FROM global_rankings WHERE device_id = $1`, deviceID)
+	return err
+}
+
 // プロフィール更新（設定画面）: user_name のみ更新。last_played_at は変えない
 const updateProfileSQL = `
 UPDATE global_rankings SET user_name = $2 WHERE device_id = $1

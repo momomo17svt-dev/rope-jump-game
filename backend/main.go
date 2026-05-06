@@ -52,6 +52,7 @@ func main() {
 	mux.HandleFunc("GET /api/rankings", getRankingsHandler(pool))
 	mux.HandleFunc("GET /api/check-username", checkUsernameHandler(pool))
 	mux.HandleFunc("PATCH /api/profile", patchProfileHandler(pool))
+	mux.HandleFunc("DELETE /api/profile", deleteProfileHandler(pool))
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -160,6 +161,22 @@ func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := db.UpdateProfile(r.Context(), pool, req.DeviceID, req.UserName); err != nil {
 			log.Printf("update profile error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func deleteProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		deviceID := r.URL.Query().Get("device_id")
+		if deviceID == "" || len(deviceID) > maxDeviceIDLen {
+			writeError(w, http.StatusBadRequest, "invalid device_id")
+			return
+		}
+		if err := db.DeleteProfile(r.Context(), pool, deviceID); err != nil {
+			log.Printf("delete profile error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}

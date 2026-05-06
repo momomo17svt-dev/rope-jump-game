@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'reac
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 import { useTopBGM } from '@/hooks/useTopBGM';
 
 export default function TitleScreen() {
@@ -102,6 +104,13 @@ export default function TitleScreen() {
               text: 'リセット',
               style: 'destructive',
               onPress: async () => {
+                // サーバーのランキングエントリーも削除
+                const user = await getLocalUser();
+                if (user) {
+                  fetch(`${API_BASE}/api/profile?device_id=${encodeURIComponent(user.device_id)}`, {
+                    method: 'DELETE',
+                  }).catch(() => {});
+                }
                 await clearLocalData();
                 setBestScore(null);
                 setShowSetup(true);
