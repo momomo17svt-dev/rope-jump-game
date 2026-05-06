@@ -50,6 +50,7 @@ func main() {
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /api/scores", postScoreHandler(pool))
 	mux.HandleFunc("GET /api/rankings", getRankingsHandler(pool))
+	mux.HandleFunc("GET /api/check-username", checkUsernameHandler(pool))
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -127,6 +128,25 @@ func validateScoreRequest(req postScoreRequest) string {
 		return "invalid score"
 	}
 	return ""
+}
+
+func checkUsernameHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		deviceID := r.URL.Query().Get("device_id")
+		if utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > maxUserNameRunes {
+			writeError(w, http.StatusBadRequest, "invalid name")
+			return
+		}
+		taken, err := db.IsUserNameTaken(r.Context(), pool, name, deviceID)
+		if err != nil {
+			log.Printf("check-username error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"available": !taken})
+	}
 }
 
 func getRankingsHandler(pool *pgxpool.Pool) http.HandlerFunc {

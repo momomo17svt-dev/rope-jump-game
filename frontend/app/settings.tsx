@@ -64,11 +64,30 @@ export default function SettingsScreen() {
     }
     setSaving(true);
     try {
+      const user = await getLocalUser();
+
+      // 名前が変わっている場合のみサーバーで重複チェック
+      if (user && trimmed !== user.user_name) {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/check-username?name=${encodeURIComponent(trimmed)}&device_id=${encodeURIComponent(user.device_id)}`
+          );
+          if (res.ok) {
+            const { available } = await res.json();
+            if (!available) {
+              Alert.alert('エラー', 'このユーザー名はすでに使われています');
+              return;
+            }
+          }
+        } catch {
+          // オフライン時はチェックをスキップして保存を続行
+        }
+      }
+
       await updateUserName(trimmed);
       await updateAvatarUris(standUri, jumpUri);
 
       // ベストスコアがあればランキングのユーザー名も更新
-      const user = await getLocalUser();
       const best = await getBestScore();
       if (user && best !== null) {
         fetch(`${API_BASE}/api/scores`, {

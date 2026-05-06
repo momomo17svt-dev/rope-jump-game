@@ -69,6 +69,16 @@ func queryRankings(ctx context.Context, pool *pgxpool.Pool, sql string, limit in
 	return out, rows.Err()
 }
 
+// IsUserNameTaken は、指定した user_name が別の device_id に使われているか確認する
+func IsUserNameTaken(ctx context.Context, pool *pgxpool.Pool, userName, deviceID string) (bool, error) {
+	var count int
+	err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM global_rankings WHERE user_name = $1 AND device_id != $2`,
+		userName, deviceID,
+	).Scan(&count)
+	return count > 0, err
+}
+
 func TopRankings(ctx context.Context, pool *pgxpool.Pool, limit int) ([]Ranking, error) {
 	return queryRankings(ctx, pool, topRankingsSQL, limit)
 }
