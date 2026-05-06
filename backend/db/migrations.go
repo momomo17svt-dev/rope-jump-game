@@ -29,12 +29,12 @@ WHERE id NOT IN (
 );
 `
 
-// UNIQUE 制約が未存在なら追加
+// UNIQUE 制約が未存在なら追加（42P07 = duplicate_table はインデックス重複時のエラーコード）
 const addUniqueSQL = `
 DO $$ BEGIN
     ALTER TABLE global_rankings
         ADD CONSTRAINT global_rankings_device_id_key UNIQUE (device_id);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_table OR duplicate_object OR SQLSTATE '42P07' THEN NULL;
 END $$;
 `
 
