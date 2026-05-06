@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg';
+import { useGameSounds } from '../hooks/useGameSounds';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -159,6 +160,8 @@ export default function GameScreen() {
   const rightSwingerBodyX = rightSwingerHandX - 40;
   const playerX = W / 2;
 
+  const { playJump, playGameover } = useGameSounds();
+
   const [gameState, setGameState] = useState<GameState>('countdown');
   const [countdownLabel, setCountdownLabel] = useState<string>('3');
   const [score, setScore] = useState(0);
@@ -248,6 +251,7 @@ export default function GameScreen() {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    playGameover();
     setGameState('gameover');
     router.replace({ pathname: '/result', params: { score: String(scoreRef.current) } });
   };
@@ -255,6 +259,7 @@ export default function GameScreen() {
   const handleTap = () => {
     if (gameState !== 'playing') return;
     if (jumpStartRef.current !== null) return;
+    playJump();
     jumpStartRef.current = Date.now();
     forceTick((n) => (n + 1) % 1000000);
   };
