@@ -17,9 +17,8 @@ INSERT INTO global_rankings (device_id, user_name, score, updated_at)
 VALUES ($1, $2, $3, NOW())
 ON CONFLICT (device_id) DO UPDATE
 SET user_name  = EXCLUDED.user_name,
-    score      = EXCLUDED.score,
+    score      = GREATEST(global_rankings.score, EXCLUDED.score),
     updated_at = NOW()
-WHERE global_rankings.score < EXCLUDED.score
 `
 
 func UpsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
