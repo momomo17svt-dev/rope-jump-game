@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-na
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg';
 import { useGameSounds } from '../hooks/useGameSounds';
+import { getLocalUser } from '../db/database';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -24,6 +25,8 @@ const PLAYER_IMG_H = 140;
 // 立ち画像と同じ縦長枠だと縦に余白ができて小さく見えるため、ジャンプ専用の広い枠を使う。
 const PLAYER_IMG_JUMP_W = 168;
 const PLAYER_IMG_JUMP_H = 140;
+// カスタムアバターは正方形で表示
+const AVATAR_SIZE = 90;
 
 const SKIN = '#fcd9b4';
 const HAIR = '#1a1a1a';
@@ -162,10 +165,21 @@ export default function GameScreen() {
 
   const { playJump, playGameover, startPlayBGM, stopPlayBGM } = useGameSounds();
 
+  const [avatarStandUri, setAvatarStandUri] = useState<string | null>(null);
+  const [avatarJumpUri, setAvatarJumpUri] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState>('countdown');
   const [countdownLabel, setCountdownLabel] = useState<string>('3');
   const [score, setScore] = useState(0);
   const [, forceTick] = useState(0);
+
+  useEffect(() => {
+    getLocalUser().then((user) => {
+      if (user) {
+        setAvatarStandUri(user.avatar_stand_uri);
+        setAvatarJumpUri(user.avatar_jump_uri);
+      }
+    });
+  }, []);
 
   const ropePhaseRef = useRef(0);
   const ropePeriodRef = useRef(INITIAL_ROPE_PERIOD);
@@ -298,20 +312,20 @@ export default function GameScreen() {
         {/* Player — both poses always mounted (so the GPU upload happens up-front),
             visibility toggled by opacity for zero-latency swap on tap */}
         <SvgImage
-          href={PLAYER_IMG_STAND}
-          x={playerX - PLAYER_IMG_W / 2}
-          y={playerFeetY - PLAYER_IMG_H}
-          width={PLAYER_IMG_W}
-          height={PLAYER_IMG_H}
+          href={avatarStandUri ? { uri: avatarStandUri } : PLAYER_IMG_STAND}
+          x={avatarStandUri ? playerX - AVATAR_SIZE / 2 : playerX - PLAYER_IMG_W / 2}
+          y={avatarStandUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_H}
+          width={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_W}
+          height={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_H}
           preserveAspectRatio="xMidYMax meet"
           opacity={jumpStartRef.current !== null ? 0 : 1}
         />
         <SvgImage
-          href={PLAYER_IMG_JUMP}
-          x={playerX - PLAYER_IMG_JUMP_W / 2}
-          y={playerFeetY - PLAYER_IMG_JUMP_H}
-          width={PLAYER_IMG_JUMP_W}
-          height={PLAYER_IMG_JUMP_H}
+          href={avatarJumpUri ? { uri: avatarJumpUri } : PLAYER_IMG_JUMP}
+          x={avatarJumpUri ? playerX - AVATAR_SIZE / 2 : playerX - PLAYER_IMG_JUMP_W / 2}
+          y={avatarJumpUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_JUMP_H}
+          width={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_W}
+          height={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_H}
           preserveAspectRatio="xMidYMax meet"
           opacity={jumpStartRef.current !== null ? 1 : 0}
         />

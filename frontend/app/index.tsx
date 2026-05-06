@@ -75,6 +75,10 @@ export default function TitleScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.settingsButton} onPress={() => { stopBGM(); router.push('/settings'); }}>
+        <Text style={styles.settingsIcon}>⚙</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>大縄跳びサバイバル</Text>
 
       {bestScore !== null && (
@@ -163,6 +167,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 20,
     textAlign: 'center',
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+  },
+  settingsIcon: {
+    fontSize: 26,
+    color: '#aaaacc',
   },
   resetButton: {
     marginTop: 32,

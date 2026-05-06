@@ -24,12 +24,32 @@ export async function initDB(): Promise<void> {
       played_at TEXT NOT NULL
     );
   `);
+
+  // マイグレーション: アバターカラムを追加（既存インストール対応）
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN avatar_stand_uri TEXT');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN avatar_jump_uri TEXT');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
 }
 
-export async function getLocalUser(): Promise<{ id: number; device_id: string; user_name: string } | null> {
+export type LocalUser = {
+  id: number;
+  device_id: string;
+  user_name: string;
+  avatar_stand_uri: string | null;
+  avatar_jump_uri: string | null;
+};
+
+export async function getLocalUser(): Promise<LocalUser | null> {
   const database = await getDB();
-  const result = await database.getFirstAsync<{ id: number; device_id: string; user_name: string }>(
-    'SELECT * FROM local_user LIMIT 1'
+  const result = await database.getFirstAsync<LocalUser>(
+    'SELECT id, device_id, user_name, avatar_stand_uri, avatar_jump_uri FROM local_user LIMIT 1'
   );
   return result ?? null;
 }
@@ -40,6 +60,20 @@ export async function saveLocalUser(deviceId: string, userName: string): Promise
     'INSERT INTO local_user (device_id, user_name) VALUES (?, ?)',
     deviceId,
     userName
+  );
+}
+
+export async function updateUserName(userName: string): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('UPDATE local_user SET user_name = ?', userName);
+}
+
+export async function updateAvatarUris(standUri: string | null, jumpUri: string | null): Promise<void> {
+  const database = await getDB();
+  await database.runAsync(
+    'UPDATE local_user SET avatar_stand_uri = ?, avatar_jump_uri = ?',
+    standUri,
+    jumpUri
   );
 }
 

@@ -6,9 +6,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const schemaSQL = `
-DROP TABLE IF EXISTS global_rankings;
-CREATE TABLE global_rankings (
+// テーブルが無ければ作成
+const createTableSQL = `
+CREATE TABLE IF NOT EXISTS global_rankings (
     id         BIGSERIAL PRIMARY KEY,
     device_id  TEXT NOT NULL,
     user_name  TEXT NOT NULL,
@@ -19,7 +19,30 @@ CREATE INDEX IF NOT EXISTS idx_global_rankings_score_desc
     ON global_rankings (score DESC, created_at ASC);
 `
 
+// 重複 device_id を除去（スコアが高い行を残す）
+const deduplicateSQL = `
+DELETE FROM global_rankings
+WHERE id NOT IN (
+    SELECT DISTINCT ON (device_id) id
+    FROM global_rankings
+    ORDER BY device_id, score DESC, created_at ASC
+);
+`
+
+// UNIQUE 制約が未存在なら追加
+const addUniqueSQL = `
+DO $$ BEGIN
+    ALTER TABLE global_rankings
+        ADD CONSTRAINT global_rankings_device_id_key UNIQUE (device_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+`
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, schemaSQL)
-	return err
+	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL} {
+		if _, err := pool.Exec(ctx, sql); err != nil {
+			return err
+		}
+	}
+	return nil
 }

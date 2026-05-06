@@ -12,13 +12,24 @@ type Ranking struct {
 	Score    int    `json:"score"`
 }
 
-const insertSQL = `
+// device_id をキーに UPSERT:
+//   - user_name は常に更新
+//   - score はより高い値のみ更新
+//   - created_at はスコアが更新されたときのみ更新（週間ランキングの基準）
+const upsertSQL = `
 INSERT INTO global_rankings (device_id, user_name, score, created_at)
 VALUES ($1, $2, $3, NOW())
+ON CONFLICT (device_id) DO UPDATE SET
+  user_name  = EXCLUDED.user_name,
+  score      = GREATEST(global_rankings.score, EXCLUDED.score),
+  created_at = CASE
+                 WHEN EXCLUDED.score > global_rankings.score THEN NOW()
+                 ELSE global_rankings.created_at
+               END
 `
 
 func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
-	_, err := pool.Exec(ctx, insertSQL, deviceID, userName, score)
+	_, err := pool.Exec(ctx, upsertSQL, deviceID, userName, score)
 	return err
 }
 
