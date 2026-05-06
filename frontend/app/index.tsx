@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import { initDB, getLocalUser, saveLocalUser, getBestScore } from '@/db/database';
+import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
 
 export default function TitleScreen() {
   const router = useRouter();
@@ -78,6 +78,26 @@ export default function TitleScreen() {
       <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
         <Text style={styles.secondaryButtonText}>ランキングを見る</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.resetButton}
+        onPress={() => {
+          Alert.alert('データをリセット', 'プレイヤー名とスコア履歴をすべて削除します。よろしいですか？', [
+            { text: 'キャンセル', style: 'cancel' },
+            {
+              text: 'リセット',
+              style: 'destructive',
+              onPress: async () => {
+                await clearLocalData();
+                setBestScore(null);
+                setShowSetup(true);
+              },
+            },
+          ]);
+        }}
+      >
+        <Text style={styles.resetButtonText}>データをリセット</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -133,6 +153,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 20,
     textAlign: 'center',
+  },
+  resetButton: {
+    marginTop: 32,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  resetButtonText: {
+    color: '#555577',
+    fontSize: 13,
   },
   input: {
     backgroundColor: '#1a1a3e',

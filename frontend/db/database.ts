@@ -60,3 +60,11 @@ export async function getBestScore(): Promise<number | null> {
   );
   return result?.best ?? null;
 }
+
+export async function clearLocalData(): Promise<void> {
+  const database = await getDB();
+  await database.execAsync(`
+    DELETE FROM local_scores;
+    DELETE FROM local_user;
+  `);
+}

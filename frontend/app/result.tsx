@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getBestScore, saveScore } from '@/db/database';
+import { getBestScore, saveScore, getLocalUser } from '@/db/database';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+
+async function postScoreToServer(deviceId: string, userName: string, score: number): Promise<void> {
+  await fetch(`${API_BASE}/api/scores`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: deviceId, user_name: userName, score }),
+  });
+}
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -15,13 +25,21 @@ export default function ResultScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const best = await getBestScore();
+      const [best, user] = await Promise.all([getBestScore(), getLocalUser()]);
       if (cancelled) return;
+
+      const newRecord = score > 0 && (best === null || score > best);
       setPrevBest(best);
-      setIsNewRecord(score > 0 && (best === null || score > best));
+      setIsNewRecord(newRecord);
+
       if (score > 0) {
         await saveScore(score);
       }
+
+      if (newRecord && user) {
+        postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+      }
+
       if (!cancelled) setReady(true);
     })();
     return () => {
