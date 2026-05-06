@@ -113,6 +113,9 @@ func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}
+		if err := db.InsertScoreHistory(r.Context(), pool, req.DeviceID, req.Score); err != nil {
+			log.Printf("score_history insert error: %v", err)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

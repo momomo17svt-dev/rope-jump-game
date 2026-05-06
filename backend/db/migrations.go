@@ -17,6 +17,17 @@ CREATE TABLE IF NOT EXISTS global_rankings (
 );
 CREATE INDEX IF NOT EXISTS idx_global_rankings_score_desc
     ON global_rankings (score DESC, created_at ASC);
+
+CREATE TABLE IF NOT EXISTS score_history (
+    id        BIGSERIAL PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    score     INTEGER NOT NULL,
+    played_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_score_history_played_at
+    ON score_history (played_at DESC);
+CREATE INDEX IF NOT EXISTS idx_score_history_device_id
+    ON score_history (device_id, played_at DESC);
 `
 
 // 重複 device_id を除去（スコアが高い行を残す）

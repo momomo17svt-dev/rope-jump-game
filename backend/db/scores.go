@@ -31,6 +31,14 @@ func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName str
 	return err
 }
 
+func InsertScoreHistory(ctx context.Context, pool *pgxpool.Pool, deviceID string, score int) error {
+	_, err := pool.Exec(ctx,
+		`INSERT INTO score_history (device_id, score) VALUES ($1, $2)`,
+		deviceID, score,
+	)
+	return err
+}
+
 // プロフィール更新（設定画面）: user_name のみ更新。last_played_at は変えない
 const updateProfileSQL = `
 UPDATE global_rankings SET user_name = $2 WHERE device_id = $1
@@ -48,11 +56,18 @@ ORDER BY score DESC, created_at ASC
 LIMIT $1
 `
 
+// 今週プレイした人の「今週内ベスト」を表示。ユーザー名は global_rankings から最新を取得
 const topWeeklyRankingsSQL = `
-SELECT user_name, score
-FROM global_rankings
-WHERE last_played_at >= NOW() - INTERVAL '7 days'
-ORDER BY score DESC, created_at ASC
+WITH weekly_best AS (
+    SELECT device_id, MAX(score) AS score
+    FROM score_history
+    WHERE played_at >= NOW() - INTERVAL '7 days'
+    GROUP BY device_id
+)
+SELECT gr.user_name, wb.score
+FROM weekly_best wb
+JOIN global_rankings gr ON gr.device_id = wb.device_id
+ORDER BY wb.score DESC, gr.created_at ASC
 LIMIT $1
 `
 
