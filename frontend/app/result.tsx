@@ -36,8 +36,25 @@ export default function ResultScreen() {
         await saveScore(score);
       }
 
-      if (newRecord && user) {
-        postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+      if (score > 0 && user) {
+        (async () => {
+          try {
+            const res = await fetch(`${API_BASE}/api/rankings`);
+            if (res.ok) {
+              const rankings: { rank: number; user_name: string; score: number }[] = await res.json();
+              const qualifies =
+                rankings.length < 100 ||
+                score > rankings[rankings.length - 1].score;
+              if (qualifies) {
+                postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+              }
+            } else {
+              postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+            }
+          } catch {
+            postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+          }
+        })();
       }
 
       if (!cancelled) setReady(true);

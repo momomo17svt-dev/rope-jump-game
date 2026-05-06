@@ -19,6 +19,7 @@ ON CONFLICT (device_id) DO UPDATE
 SET user_name  = EXCLUDED.user_name,
     score      = EXCLUDED.score,
     updated_at = NOW()
+WHERE global_rankings.score < EXCLUDED.score
 `
 
 func UpsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
