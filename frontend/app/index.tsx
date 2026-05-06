@@ -91,9 +91,15 @@ export default function TitleScreen() {
         <Text style={styles.buttonText}>TAP TO START</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => { stopBGM(); router.push('/ranking'); }}>
-        <Text style={styles.secondaryButtonText}>ランキングを見る</Text>
-      </TouchableOpacity>
+      <View style={styles.secondaryRow}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => { stopBGM(); router.push('/ranking'); }}>
+          <Text style={styles.secondaryButtonText}>ランキング</Text>
+        </TouchableOpacity>
+        <Text style={styles.secondarySep}>|</Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/history')}>
+          <Text style={styles.secondaryButtonText}>履歴</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.resetButton}
@@ -156,12 +162,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  secondaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   secondaryButton: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
   },
   secondaryButtonText: {
     color: '#aaaacc',
+    fontSize: 16,
+  },
+  secondarySep: {
+    color: '#333355',
     fontSize: 16,
   },
   modalBox: {

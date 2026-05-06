@@ -77,6 +77,20 @@ export async function updateAvatarUris(standUri: string | null, jumpUri: string 
   );
 }
 
+export type ScoreRecord = {
+  id: number;
+  score: number;
+  played_at: string;
+};
+
+export async function getScoreHistory(): Promise<ScoreRecord[]> {
+  const database = await getDB();
+  const rows = await database.getAllAsync<ScoreRecord>(
+    'SELECT id, score, played_at FROM local_scores ORDER BY played_at DESC'
+  );
+  return rows;
+}
+
 export async function saveScore(score: number): Promise<void> {
   const database = await getDB();
   const playedAt = new Date().toISOString();
