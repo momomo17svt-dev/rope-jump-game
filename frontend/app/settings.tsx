@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -16,6 +16,7 @@ export default function SettingsScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [permissionMsg, setPermissionMsg] = useState('');
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -177,6 +178,45 @@ export default function SettingsScreen() {
         {permissionMsg !== '' && <Text style={styles.errorText}>{permissionMsg}</Text>}
       </View>
 
+      {/* 背景除去ヒント */}
+      <View style={styles.hintBox}>
+        <TouchableOpacity
+          style={styles.hintHeader}
+          onPress={() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setShowHint(v => !v);
+          }}
+        >
+          <Text style={styles.hintHeaderText}>💡 背景を消すには？</Text>
+          <Text style={styles.hintChevron}>{showHint ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+        {showHint && (
+          <View style={styles.hintBody}>
+            <Text style={styles.hintNote}>iOS 16以降の機能を使うと、アプリ外で背景を除去できます。</Text>
+            <View style={styles.hintStep}>
+              <Text style={styles.hintNum}>1</Text>
+              <Text style={styles.hintText}>写真アプリで使いたい写真を開く</Text>
+            </View>
+            <View style={styles.hintStep}>
+              <Text style={styles.hintNum}>2</Text>
+              <Text style={styles.hintText}>人物部分を長押し →「被写体をコピー」を選択</Text>
+            </View>
+            <View style={styles.hintStep}>
+              <Text style={styles.hintNum}>3</Text>
+              <Text style={styles.hintText}>メモアプリを開いて長押し → 貼り付け</Text>
+            </View>
+            <View style={styles.hintStep}>
+              <Text style={styles.hintNum}>4</Text>
+              <Text style={styles.hintText}>貼り付けた画像を長押し →「写真に保存」</Text>
+            </View>
+            <View style={styles.hintStep}>
+              <Text style={styles.hintNum}>5</Text>
+              <Text style={styles.hintText}>ゲームに戻って「変更」から保存した画像を選択</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* 保存 */}
       <TouchableOpacity
         style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
@@ -281,6 +321,57 @@ const styles = StyleSheet.create({
   resetButtonText: {
     color: '#aaaacc',
     fontSize: 14,
+  },
+  hintBox: {
+    borderWidth: 1,
+    borderColor: '#2a2a4e',
+    borderRadius: 8,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  hintHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#1e1e3a',
+  },
+  hintHeaderText: {
+    color: '#aaaacc',
+    fontSize: 14,
+  },
+  hintChevron: {
+    color: '#555577',
+    fontSize: 12,
+  },
+  hintBody: {
+    padding: 14,
+    gap: 10,
+  },
+  hintNote: {
+    color: '#7777aa',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  hintStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  hintNum: {
+    color: '#4a90d9',
+    fontSize: 13,
+    fontWeight: 'bold',
+    width: 18,
+    textAlign: 'center',
+    marginTop: 1,
+  },
+  hintText: {
+    color: '#ccccee',
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 20,
   },
   saveButton: {
     backgroundColor: '#4a90d9',
