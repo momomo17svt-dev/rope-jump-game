@@ -87,13 +87,12 @@ export default function SettingsScreen() {
       await updateUserName(trimmed);
       await updateAvatarUris(standUri, jumpUri);
 
-      // ベストスコアがあればランキングのユーザー名も更新
-      const best = await getBestScore();
-      if (user && best !== null) {
-        fetch(`${API_BASE}/api/scores`, {
-          method: 'POST',
+      // ランキングのユーザー名のみ更新（last_played_at は変えない）
+      if (user) {
+        fetch(`${API_BASE}/api/profile`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: user.device_id, user_name: trimmed, score: best }),
+          body: JSON.stringify({ device_id: user.device_id, user_name: trimmed }),
         }).catch(() => {});
       }
 

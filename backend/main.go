@@ -51,6 +51,7 @@ func main() {
 	mux.HandleFunc("POST /api/scores", postScoreHandler(pool))
 	mux.HandleFunc("GET /api/rankings", getRankingsHandler(pool))
 	mux.HandleFunc("GET /api/check-username", checkUsernameHandler(pool))
+	mux.HandleFunc("PATCH /api/profile", patchProfileHandler(pool))
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -128,6 +129,39 @@ func validateScoreRequest(req postScoreRequest) string {
 		return "invalid score"
 	}
 	return ""
+}
+
+type patchProfileRequest struct {
+	DeviceID string `json:"device_id"`
+	UserName string `json:"user_name"`
+}
+
+func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+
+		var req patchProfileRequest
+		if err := dec.Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		if req.DeviceID == "" || len(req.DeviceID) > maxDeviceIDLen {
+			writeError(w, http.StatusBadRequest, "invalid device_id")
+			return
+		}
+		if nameLen := utf8.RuneCountInString(req.UserName); nameLen < 1 || nameLen > maxUserNameRunes {
+			writeError(w, http.StatusBadRequest, "invalid user_name")
+			return
+		}
+		if err := db.UpdateProfile(r.Context(), pool, req.DeviceID, req.UserName); err != nil {
+			log.Printf("update profile error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func checkUsernameHandler(pool *pgxpool.Pool) http.HandlerFunc {

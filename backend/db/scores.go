@@ -12,24 +12,32 @@ type Ranking struct {
 	Score    int    `json:"score"`
 }
 
-// device_id をキーに UPSERT:
-//   - user_name は常に更新
-//   - score はより高い値のみ更新
-//   - created_at はスコアが更新されたときのみ更新（週間ランキングの基準）
+// スコア送信（プレイ時）: last_played_at を常に更新
 const upsertSQL = `
-INSERT INTO global_rankings (device_id, user_name, score, created_at)
-VALUES ($1, $2, $3, NOW())
+INSERT INTO global_rankings (device_id, user_name, score, created_at, last_played_at)
+VALUES ($1, $2, $3, NOW(), NOW())
 ON CONFLICT (device_id) DO UPDATE SET
-  user_name  = EXCLUDED.user_name,
-  score      = GREATEST(global_rankings.score, EXCLUDED.score),
-  created_at = CASE
-                 WHEN EXCLUDED.score > global_rankings.score THEN NOW()
-                 ELSE global_rankings.created_at
-               END
+  user_name      = EXCLUDED.user_name,
+  score          = GREATEST(global_rankings.score, EXCLUDED.score),
+  created_at     = CASE
+                     WHEN EXCLUDED.score > global_rankings.score THEN NOW()
+                     ELSE global_rankings.created_at
+                   END,
+  last_played_at = NOW()
 `
 
 func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
 	_, err := pool.Exec(ctx, upsertSQL, deviceID, userName, score)
+	return err
+}
+
+// プロフィール更新（設定画面）: user_name のみ更新。last_played_at は変えない
+const updateProfileSQL = `
+UPDATE global_rankings SET user_name = $2 WHERE device_id = $1
+`
+
+func UpdateProfile(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string) error {
+	_, err := pool.Exec(ctx, updateProfileSQL, deviceID, userName)
 	return err
 }
 
@@ -43,7 +51,7 @@ LIMIT $1
 const topWeeklyRankingsSQL = `
 SELECT user_name, score
 FROM global_rankings
-WHERE created_at >= NOW() - INTERVAL '7 days'
+WHERE last_played_at >= NOW() - INTERVAL '7 days'
 ORDER BY score DESC, created_at ASC
 LIMIT $1
 `

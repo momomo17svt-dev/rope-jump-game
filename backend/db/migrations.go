@@ -6,14 +6,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// テーブルが無ければ作成
 const createTableSQL = `
 CREATE TABLE IF NOT EXISTS global_rankings (
-    id         BIGSERIAL PRIMARY KEY,
-    device_id  TEXT NOT NULL,
-    user_name  TEXT NOT NULL,
-    score      INTEGER NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id             BIGSERIAL PRIMARY KEY,
+    device_id      TEXT NOT NULL,
+    user_name      TEXT NOT NULL,
+    score          INTEGER NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_global_rankings_score_desc
     ON global_rankings (score DESC, created_at ASC);
@@ -38,8 +38,13 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 `
 
+// last_played_at カラムが未存在なら追加（既存テーブルへのマイグレーション）
+const addLastPlayedAtSQL = `
+ALTER TABLE global_rankings ADD COLUMN IF NOT EXISTS last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+`
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL} {
+	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL} {
 		if _, err := pool.Exec(ctx, sql); err != nil {
 			return err
 		}
