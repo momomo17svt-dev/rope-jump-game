@@ -32,7 +32,7 @@
 | :--- | :--- |
 | 言語/環境 | Go言語 / Dockerコンテナ |
 | データベース | PostgreSQL |
-| デプロイ先 | **Render**（Render Managed Database を使用、`render.yaml` でIaC定義） |
+| デプロイ先 | **Render Web Service**（`render.yaml` でIaC定義）+ **Neon PostgreSQL**（永続無料、別管理） |
 
 ### 開発フロー（Vibe Coding要件）
 
@@ -163,7 +163,7 @@ AIエージェントは以下のフェーズに従い、段階的に実装を進
 ### Phase 2: バックエンドAPIの構築
 
 1. Go言語とDockerを用いたAPIサーバーの構築。
-2. `render.yaml` の作成（Web Service + Managed Database の定義）。
+2. `render.yaml` の作成（Web Service のみ。DB は Neon を別途使用）。
 3. PostgreSQLのスキーマ定義（`global_rankings` テーブル）とDB接続。
 4. スコアのUpsert処理（`POST /api/scores`）の実装。
 5. ランキング取得処理（`GET /api/rankings`）の実装。

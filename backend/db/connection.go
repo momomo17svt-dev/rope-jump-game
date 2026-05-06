@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -12,6 +13,9 @@ func NewPool(ctx context.Context, dbURL string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
+	// Neon pooler (PgBouncer transaction mode) は persistent prepared statement を
+	// コネクションをまたいで保持できないため、unnamed exec mode を使う
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)

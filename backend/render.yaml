@@ -1,9 +1,3 @@
-databases:
-  - name: jumprope-db
-    databaseName: jumprope
-    plan: free
-    region: singapore
-
 services:
   - type: web
     name: jumprope-api
@@ -15,8 +9,6 @@ services:
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: jumprope-db
-          property: connectionString
+        sync: false  # Render dashboard で Neon の接続文字列を設定
       - key: PORT
         value: "8080"
