@@ -78,22 +78,6 @@ cp .env.example .env   # DATABASE_URLを設定
 go run main.go
 ```
 
-### 環境変数
-
-**frontend/.env**
-```
-EXPO_PUBLIC_API_BASE_URL=https://rope-jump-game.onrender.com
-EXPO_PUBLIC_REVENUECAT_IOS_KEY=your_revenuecat_ios_key
-EXPO_PUBLIC_ADMOB_IOS_BANNER_ID=ca-app-pub-XXXXXXXX/XXXXXXXXXX
-EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID=ca-app-pub-XXXXXXXX/XXXXXXXXXX
-```
-
-**backend/.env**
-```
-DATABASE_URL=postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/dbname?sslmode=require
-PORT=8080
-```
-
 ## 開発フロー
 
 1. `feature/機能名` ブランチを切る
