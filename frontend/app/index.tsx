@@ -13,6 +13,7 @@ export default function TitleScreen() {
   const [userName, setUserName] = useState('');
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const { start: startBGM, stop: stopBGM } = useTopBGM();
 
@@ -24,6 +25,7 @@ export default function TitleScreen() {
   );
 
   useEffect(() => {
+    fetch(`${API_BASE}/health`).catch(() => {});
     (async () => {
       await initDB();
       const user = await getLocalUser();
@@ -42,6 +44,20 @@ export default function TitleScreen() {
     if (trimmed.length < 1 || trimmed.length > 12) {
       Alert.alert('エラー', 'プレイヤー名は1〜12文字で入力してください');
       return;
+    }
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/check-username?name=${encodeURIComponent(trimmed)}&device_id=`
+      );
+      if (res.ok) {
+        const { available } = await res.json();
+        if (!available) {
+          Alert.alert('エラー', 'このユーザー名はすでに使われています');
+          return;
+        }
+      }
+    } catch {
+      // オフライン時はチェックをスキップして続行
     }
     const deviceId = Crypto.randomUUID();
     await saveLocalUser(deviceId, trimmed);
@@ -101,16 +117,21 @@ export default function TitleScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.resetButton}
-        onPress={() => {
-          Alert.alert('データをリセット', 'プレイヤー名とスコア履歴をすべて削除します。よろしいですか？', [
-            { text: 'キャンセル', style: 'cancel' },
-            {
-              text: 'リセット',
-              style: 'destructive',
-              onPress: async () => {
-                // サーバーのランキングエントリーも削除
+      {!showResetConfirm ? (
+        <TouchableOpacity style={styles.resetButton} onPress={() => setShowResetConfirm(true)}>
+          <Text style={styles.resetButtonText}>データをリセット</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.resetConfirm}>
+          <Text style={styles.resetConfirmText}>プレイヤー名とスコア履歴を削除します</Text>
+          <View style={styles.resetConfirmButtons}>
+            <TouchableOpacity style={styles.resetCancelButton} onPress={() => setShowResetConfirm(false)}>
+              <Text style={styles.resetCancelText}>キャンセル</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.resetDestructiveButton}
+              onPress={async () => {
+                setShowResetConfirm(false);
                 const user = await getLocalUser();
                 if (user) {
                   fetch(`${API_BASE}/api/profile?device_id=${encodeURIComponent(user.device_id)}`, {
@@ -120,13 +141,13 @@ export default function TitleScreen() {
                 await clearLocalData();
                 setBestScore(null);
                 setShowSetup(true);
-              },
-            },
-          ]);
-        }}
-      >
-        <Text style={styles.resetButtonText}>データをリセット</Text>
-      </TouchableOpacity>
+              }}
+            >
+              <Text style={styles.resetDestructiveText}>削除する</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -209,6 +230,42 @@ const styles = StyleSheet.create({
   resetButtonText: {
     color: '#555577',
     fontSize: 13,
+  },
+  resetConfirm: {
+    marginTop: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetConfirmText: {
+    color: '#aaaacc',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  resetConfirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resetCancelButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#555577',
+  },
+  resetCancelText: {
+    color: '#aaaacc',
+    fontSize: 14,
+  },
+  resetDestructiveButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#8b1a1a',
+  },
+  resetDestructiveText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   input: {
     backgroundColor: '#1a1a3e',

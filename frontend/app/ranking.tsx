@@ -32,11 +32,13 @@ export default function RankingScreen() {
   const fetchRankings = useCallback(async (p: Period) => {
     setLoading(true);
     setError(false);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
       const url = p === 'weekly'
         ? `${API_BASE}/api/rankings?period=weekly`
         : `${API_BASE}/api/rankings`;
-      const [user, res] = await Promise.all([getLocalUser(), fetch(url)]);
+      const [user, res] = await Promise.all([getLocalUser(), fetch(url, { signal: controller.signal })]);
       if (!res.ok) throw new Error('fetch failed');
       const data: RankingEntry[] = await res.json();
       setMyUserName(user?.user_name ?? null);
@@ -44,6 +46,7 @@ export default function RankingScreen() {
     } catch {
       setError(true);
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   }, []);

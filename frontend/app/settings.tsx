@@ -50,6 +50,12 @@ export default function SettingsScreen() {
     const srcUri = result.assets[0].uri;
     const dir = FileSystem.documentDirectory + 'avatars/';
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+
+    const prevUri = type === 'stand' ? standUri : jumpUri;
+    if (prevUri?.startsWith(dir)) {
+      await FileSystem.deleteAsync(prevUri, { idempotent: true });
+    }
+
     const dest = dir + `${type}_${Date.now()}.jpg`;
     await FileSystem.copyAsync({ from: srcUri, to: dest });
 

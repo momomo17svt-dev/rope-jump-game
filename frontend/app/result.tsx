@@ -6,11 +6,18 @@ import { getBestScore, saveScore, getLocalUser } from '@/db/database';
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 async function postScoreToServer(deviceId: string, userName: string, score: number): Promise<void> {
-  await fetch(`${API_BASE}/api/scores`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device_id: deviceId, user_name: userName, score }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    await fetch(`${API_BASE}/api/scores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId, user_name: userName, score }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default function ResultScreen() {
