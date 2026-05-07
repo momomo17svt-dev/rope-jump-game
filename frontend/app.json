@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tatsunobu.ropejump"
+      "bundleIdentifier": "com.tatsunobu.ropejump",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +35,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
-    ]
+      "expo-sqlite",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cccda667-e35b-4107-8cc0-da33eab5ea0b"
+      }
+    }
   }
 }

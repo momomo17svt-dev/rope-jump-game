@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
+import Purchases from '@/lib/purchasessafe';
+import { useAd } from '@/context/AdContext';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { adRemoved, markAdRemoved } = useAd();
   const [userName, setUserName] = useState('');
   const [standUri, setStandUri] = useState<string | null>(null);
   const [jumpUri, setJumpUri] = useState<string | null>(null);
@@ -18,6 +21,7 @@ export default function SettingsScreen() {
   const [successMsg, setSuccessMsg] = useState('');
   const [permissionMsg, setPermissionMsg] = useState('');
   const [showHint, setShowHint] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -66,6 +70,44 @@ export default function SettingsScreen() {
   const resetAvatar = (type: 'stand' | 'jump') => {
     if (type === 'stand') setStandUri(null);
     else setJumpUri(null);
+  };
+
+  const handlePurchaseRemoveAds = async () => {
+    setPurchasing(true);
+    try {
+      const offerings = await Purchases.getOfferings();
+      const pkg = offerings.current?.availablePackages[0];
+      if (!pkg) {
+        Alert.alert('エラー', '購入情報を取得できませんでした');
+        return;
+      }
+      await Purchases.purchasePackage(pkg);
+      await markAdRemoved();
+      Alert.alert('完了', '広告が削除されました！');
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        Alert.alert('エラー', '購入に失敗しました');
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    setPurchasing(true);
+    try {
+      const info = await Purchases.restorePurchases();
+      if (Object.keys(info.entitlements.active).length > 0) {
+        await markAdRemoved();
+        Alert.alert('復元完了', '広告が削除されました！');
+      } else {
+        Alert.alert('復元失敗', '購入履歴が見つかりませんでした');
+      }
+    } catch {
+      Alert.alert('エラー', '復元に失敗しました');
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   const saveAll = async () => {
@@ -221,6 +263,31 @@ export default function SettingsScreen() {
               <Text style={styles.hintNum}>5</Text>
               <Text style={styles.hintText}>ゲームに戻って「変更」から保存した画像を選択</Text>
             </View>
+          </View>
+        )}
+      </View>
+
+      {/* 広告削除 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>課金</Text>
+        {adRemoved ? (
+          <View style={styles.adRemovedBadge}>
+            <Text style={styles.adRemovedText}>広告削除済み</Text>
+          </View>
+        ) : (
+          <View style={styles.purchaseBox}>
+            <TouchableOpacity
+              style={[styles.purchaseButton, purchasing && styles.saveButtonDisabled]}
+              onPress={handlePurchaseRemoveAds}
+              disabled={purchasing}
+            >
+              <Text style={styles.purchaseButtonText}>
+                {purchasing ? '処理中...' : '広告を削除する'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.restoreButton} onPress={handleRestorePurchases} disabled={purchasing}>
+              <Text style={styles.restoreButtonText}>購入を復元</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -398,6 +465,41 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  purchaseBox: {
+    gap: 10,
+  },
+  purchaseButton: {
+    backgroundColor: '#e8a020',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  purchaseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  restoreButton: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  restoreButtonText: {
+    color: '#4a90d9',
+    fontSize: 14,
+  },
+  adRemovedBadge: {
+    backgroundColor: '#1e3a1e',
+    borderWidth: 1,
+    borderColor: '#4a9a4a',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  adRemovedText: {
+    color: '#6adf6a',
+    fontSize: 15,
     fontWeight: 'bold',
   },
 });

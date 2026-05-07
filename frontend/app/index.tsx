@@ -3,12 +3,19 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'reac
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
+import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
+import { useAd } from '@/context/AdContext';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 import { useTopBGM } from '@/hooks/useTopBGM';
 
+const BANNER_ID = __DEV__
+  ? TestIds.BANNER
+  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID ?? '');
+
 export default function TitleScreen() {
   const router = useRouter();
+  const { adRemoved } = useAd();
   const [showSetup, setShowSetup] = useState(false);
   const [userName, setUserName] = useState('');
   const [bestScore, setBestScore] = useState<number | null>(null);
@@ -93,6 +100,11 @@ export default function TitleScreen() {
 
   return (
     <View style={styles.container}>
+      {!adRemoved && BannerAd && (
+        <View style={styles.bannerContainer}>
+          <BannerAd unitId={BANNER_ID} size={BannerAdSize.BANNER} />
+        </View>
+      )}
       <TouchableOpacity style={styles.settingsButton} onPress={() => { stopBGM(); router.push('/settings'); }}>
         <Text style={styles.settingsIcon}>⚙</Text>
       </TouchableOpacity>
@@ -158,6 +170,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 36,

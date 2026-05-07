@@ -36,6 +36,11 @@ export async function initDB(): Promise<void> {
   } catch {
     // カラムが既に存在する場合は無視
   }
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN ad_removed INTEGER DEFAULT 0');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
 }
 
 export type LocalUser = {
@@ -107,6 +112,19 @@ export async function getBestScore(): Promise<number | null> {
     'SELECT MAX(score) as best FROM local_scores'
   );
   return result?.best ?? null;
+}
+
+export async function getAdRemoved(): Promise<boolean> {
+  const database = await getDB();
+  const result = await database.getFirstAsync<{ ad_removed: number }>(
+    'SELECT ad_removed FROM local_user LIMIT 1'
+  );
+  return (result?.ad_removed ?? 0) === 1;
+}
+
+export async function setAdRemoved(value: boolean): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('UPDATE local_user SET ad_removed = ?', value ? 1 : 0);
 }
 
 export async function clearLocalData(): Promise<void> {

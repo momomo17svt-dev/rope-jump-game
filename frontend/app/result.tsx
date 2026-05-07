@@ -2,8 +2,14 @@ import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getBestScore, saveScore, getLocalUser } from '@/db/database';
+import { useInterstitialAd, TestIds } from '@/lib/adsafe';
+import { useAd } from '@/context/AdContext';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+
+const INTERSTITIAL_ID = __DEV__
+  ? TestIds.INTERSTITIAL
+  : (process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID ?? '');
 
 async function postScoreToServer(deviceId: string, userName: string, score: number): Promise<void> {
   const controller = new AbortController();
@@ -22,12 +28,25 @@ async function postScoreToServer(deviceId: string, userName: string, score: numb
 
 export default function ResultScreen() {
   const router = useRouter();
+  const { adRemoved } = useAd();
   const { score: scoreParam } = useLocalSearchParams<{ score?: string }>();
   const score = Math.max(0, parseInt(scoreParam ?? '0', 10) || 0);
 
   const [prevBest, setPrevBest] = useState<number | null>(null);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [ready, setReady] = useState(false);
+
+  const { isLoaded, load, show, addAdEventListener } = useInterstitialAd(INTERSTITIAL_ID);
+
+  useEffect(() => {
+    if (!adRemoved) load();
+  }, [adRemoved]);
+
+  useEffect(() => {
+    if (!adRemoved && isLoaded && ready) {
+      show();
+    }
+  }, [isLoaded, ready, adRemoved]);
 
   useEffect(() => {
     let cancelled = false;
