@@ -119,9 +119,27 @@
 
 ---
 
-## バックログ（将来対応）
+## Phase 6: 収益化
 
-- [x] サウンドエフェクト（ジャンプ音・ゲームオーバー音）
-- [x] BGM
-- [ ] ピクセルアートへのグラフィック差し替え
-- [ ] App Store / Google Play への申請
+### 6-1. 広告（AdMob）
+- [x] `react-native-google-mobile-ads` を導入
+- [x] タイトル画面下部にバナー広告を表示（`ad_removed` が false の場合のみ）
+- [x] リザルト画面でインタースティシャル広告を表示（ゲームオーバー時）
+- [x] Expo Go 互換対応（`lib/adsafe.ts` で try/catch ラップ）
+- [ ] AdMob アカウントでアプリ登録・本番広告ユニット ID を `.env` に設定
+
+### 6-2. 課金（RevenueCat）
+- [x] `react-native-purchases` を導入
+- [x] `local_user` テーブルに `ad_removed` カラムを追加
+- [x] `context/AdContext.tsx` で `adRemoved` 状態をアプリ全体に共有
+- [x] 設定画面に「広告を削除する」ボタン・「購入を復元」ボタンを追加
+- [x] Expo Go 互換対応（`lib/purchasessafe.ts` で try/catch ラップ）
+- [ ] RevenueCat アカウント作成・iOS API キーを `.env` に設定
+- [ ] App Store Connect で非消耗型課金商品を作成
+
+### 6-3. ストア申請
+- [ ] Apple Developer Program 登録（年 $99）
+- [ ] EAS Build で本番ビルドを作成・実機テスト
+- [ ] App Store Connect でアプリ情報・スクリーンショット・プライバシーポリシーを整備
+- [ ] App Store 審査申請
+- [ ] ピクセルアートへのグラフィック差し替え（申請前推奨）
