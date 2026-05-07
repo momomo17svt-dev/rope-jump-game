@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: jumprope-api
+    runtime: docker
+    region: singapore
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # Render dashboard で Neon の接続文字列を設定
+      - key: PORT
+        value: "8080"

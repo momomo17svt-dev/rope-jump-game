@@ -44,43 +44,112 @@
 ## Phase 2: バックエンドAPIの構築
 
 ### 2-1. プロジェクトセットアップ
-- [ ] `backend/` ディレクトリの作成と `go mod init`
-- [ ] `Dockerfile` の作成
-- [ ] `render.yaml` の作成（Web Service + Managed Database）
+- [x] `backend/` ディレクトリの作成と `go mod init`
+- [x] `Dockerfile` の作成
+- [x] `render.yaml` の作成（Web Service のみ。DB は Neon を別途使用）
 
 ### 2-2. データベース
-- [ ] `global_rankings` テーブルのスキーマ定義
-- [ ] マイグレーションスクリプトの作成
-- [ ] PostgreSQL接続設定（環境変数で管理）
+- [x] `global_rankings` テーブルのスキーマ定義
+- [x] マイグレーションスクリプトの作成
+- [x] PostgreSQL接続設定（環境変数で管理）
 
 ### 2-3. APIエンドポイント
-- [ ] `POST /api/scores` — スコアのUpsert処理（`device_id` キーで上書き）
-- [ ] `GET /api/rankings` — 上位100件の取得
-- [ ] ヘルスチェックエンドポイント（`GET /health`）
+- [x] `POST /api/scores` — スコアのUpsert処理（`device_id` キーで上書き）
+- [x] `GET /api/rankings` — 上位100件の取得
+- [x] ヘルスチェックエンドポイント（`GET /health`）
 
 ### 2-4. デプロイ
-- [ ] Renderへのデプロイと動作確認
+- [x] Render Web Service + Neon へのデプロイと動作確認
 
 ---
 
 ## Phase 3: フロントエンドとAPIの統合
 
 ### 3-1. ランキング画面
-- [ ] `GET /api/rankings` からデータ取得
-- [ ] ランキングリストのUI実装（順位・ユーザー名・スコア）
-- [ ] `device_id` による自分のエントリーのハイライト表示
-- [ ] ローディング・エラー状態のUI
+- [x] `GET /api/rankings` からデータ取得
+- [x] ランキングリストのUI実装（順位・ユーザー名・スコア）
+- [x] `device_id` による自分のエントリーのハイライト表示
+- [x] ローディング・エラー状態のUI
 
 ### 3-2. スコア送信
-- [ ] リザルト画面で自己ベスト更新時の `POST /api/scores` 非同期送信
-- [ ] オンライン判定（送信失敗時はサイレントに無視）
+- [x] リザルト画面で自己ベスト更新時の `POST /api/scores` 非同期送信
+- [x] オンライン判定（送信失敗時はサイレントに無視）
 
 ---
 
-## バックログ（将来対応）
+## Phase 4: 設定機能
 
-- [ ] サウンドエフェクト（ジャンプ音・ゲームオーバー音）
-- [ ] BGM
-- [ ] ピクセルアートへのグラフィック差し替え
-- [ ] ランキングへのユーザー名変更機能
-- [ ] App Store / Google Play への申請
+### 4-1. DB拡張
+- [x] `local_user` に `avatar_stand_uri` / `avatar_jump_uri` カラムを追加（マイグレーション対応）
+- [x] `updateUserName` / `updateAvatarUris` / `getLocalUser`（拡張版）関数を追加
+
+### 4-2. 設定画面
+- [x] `app/settings.tsx` の新規作成
+- [x] ユーザー名変更UI（バリデーション・重複チェック・保存）
+- [x] 「立ち」アバター変更UI（expo-image-picker・プレビュー・デフォルト戻し）
+- [x] 「ジャンプ」アバター変更UI（同上）
+
+### 4-3. タイトル画面
+- [x] 右上に設定アイコンボタンを追加
+
+### 4-4. ゲーム画面
+- [x] アバターURIをDBから読み込みプレイヤー画像に反映（正方形表示・フォールバックあり）
+
+### 4-6. プレイ履歴画面
+- [x] `getScoreHistory()` 関数追加（全履歴を新しい順に取得）
+- [x] `app/history.tsx` 新規作成（プレイ回数・スコア・日時・BESTハイライト）
+- [x] タイトル画面に「履歴」ボタンをランキングと並べて追加
+
+### 4-5. バックエンド改善
+- [x] POST /api/scores を INSERT → UPSERT に修正（device_id キーで1行管理）
+- [x] GET /api/check-username で重複チェックエンドポイント追加
+- [x] PATCH /api/profile でユーザー名のみ更新（last_played_at を変えない）
+- [x] score_history テーブルを追加し週間ランキングを「今週内ベスト」に変更
+
+---
+
+---
+
+## Phase 5: 難易度調整・鬼畜仕様
+
+### 5-1. スローフェイント
+- [x] `basePeriodRef` で正規速度を管理（スピードアップ時に更新）
+- [x] スコア10以上・20%確率・750ms間だけ縄を2.2倍に減速、その後元速度へスナップバック
+- [x] フェイント中にスピードアップタイミングが重なっても正規速度が正しく累積されるよう対応
+
+---
+
+## Phase 6: 収益化
+
+> 使用サービス一覧
+> - **広告配信:** Google AdMob（[admob.google.com](https://admob.google.com)）
+> - **課金管理:** RevenueCat（[app.revenuecat.com](https://app.revenuecat.com)）— App Store IAP のレシート検証・復元を担当
+> - **ネイティブビルド:** EAS Build（[expo.dev](https://expo.dev)）— Expo Go では動作しないネイティブモジュールのビルドに使用
+> - **ストア:** App Store Connect（[appstoreconnect.apple.com](https://appstoreconnect.apple.com)）
+> - **Apple Developer Program:** 年 $99（EAS ビルド・ストア申請に必須）
+
+### 6-1. 広告（AdMob）
+- [x] `react-native-google-mobile-ads` を導入
+- [x] タイトル画面下部にバナー広告を表示（`ad_removed` が false の場合のみ）
+- [x] リザルト画面でインタースティシャル広告を表示（ゲームオーバー時）
+- [x] Expo Go 互換対応（`lib/adsafe.ts` で try/catch ラップ）
+- [ ] AdMob アカウントでアプリ登録・本番 App ID を `app.json` に設定
+- [ ] バナー・インタースティシャルの本番広告ユニット ID を `frontend/.env` に設定
+
+### 6-2. 課金（RevenueCat × App Store IAP）
+- [x] `react-native-purchases` を導入
+- [x] `local_user` テーブルに `ad_removed` カラムを追加（マイグレーション対応）
+- [x] `context/AdContext.tsx` で `adRemoved` 状態をアプリ全体に共有
+- [x] 設定画面に「広告を削除する」ボタン・「購入を復元」ボタンを追加
+- [x] Expo Go 互換対応（`lib/purchasessafe.ts` で try/catch ラップ）
+- [ ] RevenueCat プロジェクト作成・iOS Public API キーを `frontend/.env` に設定
+- [ ] App Store Connect で非消耗型課金商品（`remove_ads`）を作成
+- [ ] RevenueCat ダッシュボードで App Store と連携・Offering を設定
+
+### 6-3. ストア申請
+- [ ] Apple Developer Program 登録（年 $99）
+- [ ] EAS Build（`eas build --platform ios --profile production`）で本番 IPA を作成
+- [ ] TestFlight で実機テスト（広告表示・課金フロー確認）
+- [ ] App Store Connect でアプリ情報・スクリーンショット・プライバシーポリシーを整備
+- [ ] App Store 審査申請
+- [ ] ピクセルアートへのグラフィック差し替え（申請前推奨）

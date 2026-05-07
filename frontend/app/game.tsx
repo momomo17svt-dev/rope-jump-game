@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg';
+import { useGameSounds } from '../hooks/useGameSounds';
+import { getLocalUser } from '../db/database';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -10,6 +12,10 @@ const INITIAL_ROPE_PERIOD = 850;
 const MIN_ROPE_PERIOD = 220;
 const SPEED_INCREASE_RATIO = 0.93;
 const SPEED_INCREASE_INTERVAL = 5;
+const FEINT_MIN_SCORE = 10;
+const FEINT_PROBABILITY = 0.20;
+const FEINT_SLOW_MULTIPLIER = 2.2;
+const FEINT_DURATION_MS = 750;
 const COUNTDOWN_STEP_MS = 800;
 // バックグラウンド復帰や深刻なフレームスパイクで dt がここを超えたら、
 // 縄の位相 0.5 跨ぎ判定が取りこぼされる恐れがあるので 1 フレームを破棄する。
@@ -23,6 +29,8 @@ const PLAYER_IMG_H = 140;
 // 立ち画像と同じ縦長枠だと縦に余白ができて小さく見えるため、ジャンプ専用の広い枠を使う。
 const PLAYER_IMG_JUMP_W = 168;
 const PLAYER_IMG_JUMP_H = 140;
+// カスタムアバターは正方形で表示
+const AVATAR_SIZE = 90;
 
 const SKIN = '#fcd9b4';
 const HAIR = '#1a1a1a';
@@ -159,13 +167,28 @@ export default function GameScreen() {
   const rightSwingerBodyX = rightSwingerHandX - 40;
   const playerX = W / 2;
 
+  const { playJump, playGameover, startPlayBGM, stopPlayBGM } = useGameSounds();
+
+  const [avatarStandUri, setAvatarStandUri] = useState<string | null>(null);
+  const [avatarJumpUri, setAvatarJumpUri] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState>('countdown');
   const [countdownLabel, setCountdownLabel] = useState<string>('3');
   const [score, setScore] = useState(0);
   const [, forceTick] = useState(0);
 
+  useEffect(() => {
+    getLocalUser().then((user) => {
+      if (user) {
+        setAvatarStandUri(user.avatar_stand_uri);
+        setAvatarJumpUri(user.avatar_jump_uri);
+      }
+    });
+  }, []);
+
   const ropePhaseRef = useRef(0);
   const ropePeriodRef = useRef(INITIAL_ROPE_PERIOD);
+  const basePeriodRef = useRef(INITIAL_ROPE_PERIOD);
+  const feintEndTimeRef = useRef<number | null>(null);
   const playerJumpYRef = useRef(0);
   const jumpStartRef = useRef<number | null>(null);
   const lastFrameRef = useRef(0);
@@ -192,6 +215,10 @@ export default function GameScreen() {
   }, [gameState]);
 
   useEffect(() => {
+    if (gameState === 'playing') startPlayBGM();
+  }, [gameState]);
+
+  useEffect(() => {
     if (gameState !== 'playing') return;
     lastFrameRef.current = Date.now();
 
@@ -203,6 +230,11 @@ export default function GameScreen() {
       if (dt > MAX_FRAME_DT) {
         rafRef.current = requestAnimationFrame(loop);
         return;
+      }
+
+      if (feintEndTimeRef.current !== null && now >= feintEndTimeRef.current) {
+        ropePeriodRef.current = basePeriodRef.current;
+        feintEndTimeRef.current = null;
       }
 
       const prevPhase = ropePhaseRef.current;
@@ -229,9 +261,21 @@ export default function GameScreen() {
         scoreRef.current += 1;
         setScore(scoreRef.current);
         if (scoreRef.current % SPEED_INCREASE_INTERVAL === 0) {
-          ropePeriodRef.current =
+          const newPeriod =
             MIN_ROPE_PERIOD +
-            (ropePeriodRef.current - MIN_ROPE_PERIOD) * SPEED_INCREASE_RATIO;
+            (basePeriodRef.current - MIN_ROPE_PERIOD) * SPEED_INCREASE_RATIO;
+          basePeriodRef.current = newPeriod;
+          if (feintEndTimeRef.current === null) {
+            ropePeriodRef.current = newPeriod;
+          }
+        }
+        if (
+          scoreRef.current >= FEINT_MIN_SCORE &&
+          feintEndTimeRef.current === null &&
+          Math.random() < FEINT_PROBABILITY
+        ) {
+          ropePeriodRef.current = basePeriodRef.current * FEINT_SLOW_MULTIPLIER;
+          feintEndTimeRef.current = now + FEINT_DURATION_MS;
         }
       }
 
@@ -248,13 +292,19 @@ export default function GameScreen() {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    stopPlayBGM();
+    playGameover();
     setGameState('gameover');
-    router.replace({ pathname: '/result', params: { score: String(scoreRef.current) } });
+    const finalScore = scoreRef.current;
+    setTimeout(() => {
+      router.replace({ pathname: '/result', params: { score: String(finalScore) } });
+    }, 600);
   };
 
   const handleTap = () => {
     if (gameState !== 'playing') return;
     if (jumpStartRef.current !== null) return;
+    playJump();
     jumpStartRef.current = Date.now();
     forceTick((n) => (n + 1) % 1000000);
   };
@@ -285,20 +335,20 @@ export default function GameScreen() {
         {/* Player — both poses always mounted (so the GPU upload happens up-front),
             visibility toggled by opacity for zero-latency swap on tap */}
         <SvgImage
-          href={PLAYER_IMG_STAND}
-          x={playerX - PLAYER_IMG_W / 2}
-          y={playerFeetY - PLAYER_IMG_H}
-          width={PLAYER_IMG_W}
-          height={PLAYER_IMG_H}
+          href={avatarStandUri ? { uri: avatarStandUri } : PLAYER_IMG_STAND}
+          x={avatarStandUri ? playerX - AVATAR_SIZE / 2 : playerX - PLAYER_IMG_W / 2}
+          y={avatarStandUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_H}
+          width={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_W}
+          height={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_H}
           preserveAspectRatio="xMidYMax meet"
           opacity={jumpStartRef.current !== null ? 0 : 1}
         />
         <SvgImage
-          href={PLAYER_IMG_JUMP}
-          x={playerX - PLAYER_IMG_JUMP_W / 2}
-          y={playerFeetY - PLAYER_IMG_JUMP_H}
-          width={PLAYER_IMG_JUMP_W}
-          height={PLAYER_IMG_JUMP_H}
+          href={avatarJumpUri ? { uri: avatarJumpUri } : PLAYER_IMG_JUMP}
+          x={avatarJumpUri ? playerX - AVATAR_SIZE / 2 : playerX - PLAYER_IMG_JUMP_W / 2}
+          y={avatarJumpUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_JUMP_H}
+          width={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_W}
+          height={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_H}
           preserveAspectRatio="xMidYMax meet"
           opacity={jumpStartRef.current !== null ? 1 : 0}
         />

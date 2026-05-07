@@ -1,17 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import { initDB, getLocalUser, saveLocalUser, getBestScore } from '@/db/database';
+import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
+import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
+import { useAd } from '@/context/AdContext';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+import { useTopBGM } from '@/hooks/useTopBGM';
+
+const BANNER_ID = __DEV__
+  ? TestIds.BANNER
+  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID ?? '');
 
 export default function TitleScreen() {
   const router = useRouter();
+  const { adRemoved } = useAd();
   const [showSetup, setShowSetup] = useState(false);
   const [userName, setUserName] = useState('');
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const { start: startBGM, stop: stopBGM } = useTopBGM();
+
+  useFocusEffect(
+    useCallback(() => {
+      startBGM();
+      return () => stopBGM();
+    }, [])
+  );
 
   useEffect(() => {
+    fetch(`${API_BASE}/health`).catch(() => {});
     (async () => {
       await initDB();
       const user = await getLocalUser();
@@ -30,6 +51,20 @@ export default function TitleScreen() {
     if (trimmed.length < 1 || trimmed.length > 12) {
       Alert.alert('エラー', 'プレイヤー名は1〜12文字で入力してください');
       return;
+    }
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/check-username?name=${encodeURIComponent(trimmed)}&device_id=`
+      );
+      if (res.ok) {
+        const { available } = await res.json();
+        if (!available) {
+          Alert.alert('エラー', 'このユーザー名はすでに使われています');
+          return;
+        }
+      }
+    } catch {
+      // オフライン時はチェックをスキップして続行
     }
     const deviceId = Crypto.randomUUID();
     await saveLocalUser(deviceId, trimmed);
@@ -65,19 +100,66 @@ export default function TitleScreen() {
 
   return (
     <View style={styles.container}>
+      {!adRemoved && BannerAd && (
+        <View style={styles.bannerContainer}>
+          <BannerAd unitId={BANNER_ID} size={BannerAdSize.BANNER} />
+        </View>
+      )}
+      <TouchableOpacity style={styles.settingsButton} onPress={() => { stopBGM(); router.push('/settings'); }}>
+        <Text style={styles.settingsIcon}>⚙</Text>
+      </TouchableOpacity>
+
       <Text style={styles.title}>大縄跳びサバイバル</Text>
 
       {bestScore !== null && (
         <Text style={styles.bestScore}>自己ベスト: {bestScore} 回</Text>
       )}
 
-      <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/game')}>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => { stopBGM(); router.push('/game'); }}>
         <Text style={styles.buttonText}>TAP TO START</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
-        <Text style={styles.secondaryButtonText}>ランキングを見る</Text>
-      </TouchableOpacity>
+      <View style={styles.secondaryRow}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => { stopBGM(); router.push('/ranking'); }}>
+          <Text style={styles.secondaryButtonText}>ランキング</Text>
+        </TouchableOpacity>
+        <Text style={styles.secondarySep}>|</Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/history')}>
+          <Text style={styles.secondaryButtonText}>履歴</Text>
+        </TouchableOpacity>
+      </View>
+
+      {!showResetConfirm ? (
+        <TouchableOpacity style={styles.resetButton} onPress={() => setShowResetConfirm(true)}>
+          <Text style={styles.resetButtonText}>データをリセット</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.resetConfirm}>
+          <Text style={styles.resetConfirmText}>プレイヤー名とスコア履歴を削除します</Text>
+          <View style={styles.resetConfirmButtons}>
+            <TouchableOpacity style={styles.resetCancelButton} onPress={() => setShowResetConfirm(false)}>
+              <Text style={styles.resetCancelText}>キャンセル</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.resetDestructiveButton}
+              onPress={async () => {
+                setShowResetConfirm(false);
+                const user = await getLocalUser();
+                if (user) {
+                  fetch(`${API_BASE}/api/profile?device_id=${encodeURIComponent(user.device_id)}`, {
+                    method: 'DELETE',
+                  }).catch(() => {});
+                }
+                await clearLocalData();
+                setBestScore(null);
+                setShowSetup(true);
+              }}
+            >
+              <Text style={styles.resetDestructiveText}>削除する</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -88,6 +170,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 36,
@@ -113,12 +200,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  secondaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   secondaryButton: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
   },
   secondaryButtonText: {
     color: '#aaaacc',
+    fontSize: 16,
+  },
+  secondarySep: {
+    color: '#333355',
     fontSize: 16,
   },
   modalBox: {
@@ -133,6 +228,61 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 20,
     textAlign: 'center',
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+  },
+  settingsIcon: {
+    fontSize: 26,
+    color: '#aaaacc',
+  },
+  resetButton: {
+    marginTop: 32,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  resetButtonText: {
+    color: '#555577',
+    fontSize: 13,
+  },
+  resetConfirm: {
+    marginTop: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  resetConfirmText: {
+    color: '#aaaacc',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  resetConfirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resetCancelButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#555577',
+  },
+  resetCancelText: {
+    color: '#aaaacc',
+    fontSize: 14,
+  },
+  resetDestructiveButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#8b1a1a',
+  },
+  resetDestructiveText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   input: {
     backgroundColor: '#1a1a3e',

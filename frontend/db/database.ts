@@ -24,12 +24,37 @@ export async function initDB(): Promise<void> {
       played_at TEXT NOT NULL
     );
   `);
+
+  // マイグレーション: アバターカラムを追加（既存インストール対応）
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN avatar_stand_uri TEXT');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN avatar_jump_uri TEXT');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
+  try {
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN ad_removed INTEGER DEFAULT 0');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
 }
 
-export async function getLocalUser(): Promise<{ id: number; device_id: string; user_name: string } | null> {
+export type LocalUser = {
+  id: number;
+  device_id: string;
+  user_name: string;
+  avatar_stand_uri: string | null;
+  avatar_jump_uri: string | null;
+};
+
+export async function getLocalUser(): Promise<LocalUser | null> {
   const database = await getDB();
-  const result = await database.getFirstAsync<{ id: number; device_id: string; user_name: string }>(
-    'SELECT * FROM local_user LIMIT 1'
+  const result = await database.getFirstAsync<LocalUser>(
+    'SELECT id, device_id, user_name, avatar_stand_uri, avatar_jump_uri FROM local_user LIMIT 1'
   );
   return result ?? null;
 }
@@ -41,6 +66,34 @@ export async function saveLocalUser(deviceId: string, userName: string): Promise
     deviceId,
     userName
   );
+}
+
+export async function updateUserName(userName: string): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('UPDATE local_user SET user_name = ?', userName);
+}
+
+export async function updateAvatarUris(standUri: string | null, jumpUri: string | null): Promise<void> {
+  const database = await getDB();
+  await database.runAsync(
+    'UPDATE local_user SET avatar_stand_uri = ?, avatar_jump_uri = ?',
+    standUri,
+    jumpUri
+  );
+}
+
+export type ScoreRecord = {
+  id: number;
+  score: number;
+  played_at: string;
+};
+
+export async function getScoreHistory(): Promise<ScoreRecord[]> {
+  const database = await getDB();
+  const rows = await database.getAllAsync<ScoreRecord>(
+    'SELECT id, score, played_at FROM local_scores ORDER BY played_at DESC'
+  );
+  return rows;
 }
 
 export async function saveScore(score: number): Promise<void> {
@@ -59,4 +112,25 @@ export async function getBestScore(): Promise<number | null> {
     'SELECT MAX(score) as best FROM local_scores'
   );
   return result?.best ?? null;
+}
+
+export async function getAdRemoved(): Promise<boolean> {
+  const database = await getDB();
+  const result = await database.getFirstAsync<{ ad_removed: number }>(
+    'SELECT ad_removed FROM local_user LIMIT 1'
+  );
+  return (result?.ad_removed ?? 0) === 1;
+}
+
+export async function setAdRemoved(value: boolean): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('UPDATE local_user SET ad_removed = ?', value ? 1 : 0);
+}
+
+export async function clearLocalData(): Promise<void> {
+  const database = await getDB();
+  await database.execAsync(`
+    DELETE FROM local_scores;
+    DELETE FROM local_user;
+  `);
 }
