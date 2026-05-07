@@ -1,13 +1,12 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
 import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
 import { useAd } from '@/context/AdContext';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-import { useTopBGM } from '@/hooks/useTopBGM';
 
 const BANNER_ID = __DEV__
   ? TestIds.BANNER
@@ -21,15 +20,6 @@ export default function TitleScreen() {
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-
-  const { start: startBGM, stop: stopBGM } = useTopBGM();
-
-  useFocusEffect(
-    useCallback(() => {
-      startBGM();
-      return () => stopBGM();
-    }, [])
-  );
 
   useEffect(() => {
     fetch(`${API_BASE}/health`).catch(() => {});
@@ -105,7 +95,7 @@ export default function TitleScreen() {
           <BannerAd unitId={BANNER_ID} size={BannerAdSize.BANNER} />
         </View>
       )}
-      <TouchableOpacity style={styles.settingsButton} onPress={() => { stopBGM(); router.push('/settings'); }}>
+      <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
         <Text style={styles.settingsIcon}>⚙</Text>
       </TouchableOpacity>
 
@@ -115,12 +105,12 @@ export default function TitleScreen() {
         <Text style={styles.bestScore}>自己ベスト: {bestScore} 回</Text>
       )}
 
-      <TouchableOpacity style={styles.primaryButton} onPress={() => { stopBGM(); router.push('/game'); }}>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/game')}>
         <Text style={styles.buttonText}>TAP TO START</Text>
       </TouchableOpacity>
 
       <View style={styles.secondaryRow}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => { stopBGM(); router.push('/ranking'); }}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
           <Text style={styles.secondaryButtonText}>ランキング</Text>
         </TouchableOpacity>
         <Text style={styles.secondarySep}>|</Text>
