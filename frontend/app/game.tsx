@@ -12,6 +12,10 @@ const INITIAL_ROPE_PERIOD = 850;
 const MIN_ROPE_PERIOD = 220;
 const SPEED_INCREASE_RATIO = 0.93;
 const SPEED_INCREASE_INTERVAL = 5;
+const FEINT_MIN_SCORE = 10;
+const FEINT_PROBABILITY = 0.20;
+const FEINT_SLOW_MULTIPLIER = 2.2;
+const FEINT_DURATION_MS = 750;
 const COUNTDOWN_STEP_MS = 800;
 // バックグラウンド復帰や深刻なフレームスパイクで dt がここを超えたら、
 // 縄の位相 0.5 跨ぎ判定が取りこぼされる恐れがあるので 1 フレームを破棄する。
@@ -183,6 +187,8 @@ export default function GameScreen() {
 
   const ropePhaseRef = useRef(0);
   const ropePeriodRef = useRef(INITIAL_ROPE_PERIOD);
+  const basePeriodRef = useRef(INITIAL_ROPE_PERIOD);
+  const feintEndTimeRef = useRef<number | null>(null);
   const playerJumpYRef = useRef(0);
   const jumpStartRef = useRef<number | null>(null);
   const lastFrameRef = useRef(0);
@@ -226,6 +232,11 @@ export default function GameScreen() {
         return;
       }
 
+      if (feintEndTimeRef.current !== null && now >= feintEndTimeRef.current) {
+        ropePeriodRef.current = basePeriodRef.current;
+        feintEndTimeRef.current = null;
+      }
+
       const prevPhase = ropePhaseRef.current;
       const newPhase = (prevPhase + dt / ropePeriodRef.current) % 1;
       ropePhaseRef.current = newPhase;
@@ -250,9 +261,21 @@ export default function GameScreen() {
         scoreRef.current += 1;
         setScore(scoreRef.current);
         if (scoreRef.current % SPEED_INCREASE_INTERVAL === 0) {
-          ropePeriodRef.current =
+          const newPeriod =
             MIN_ROPE_PERIOD +
-            (ropePeriodRef.current - MIN_ROPE_PERIOD) * SPEED_INCREASE_RATIO;
+            (basePeriodRef.current - MIN_ROPE_PERIOD) * SPEED_INCREASE_RATIO;
+          basePeriodRef.current = newPeriod;
+          if (feintEndTimeRef.current === null) {
+            ropePeriodRef.current = newPeriod;
+          }
+        }
+        if (
+          scoreRef.current >= FEINT_MIN_SCORE &&
+          feintEndTimeRef.current === null &&
+          Math.random() < FEINT_PROBABILITY
+        ) {
+          ropePeriodRef.current = basePeriodRef.current * FEINT_SLOW_MULTIPLIER;
+          feintEndTimeRef.current = now + FEINT_DURATION_MS;
         }
       }
 
