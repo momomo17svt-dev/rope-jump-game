@@ -90,7 +90,7 @@ export default function TitleScreen() {
 
   return (
     <View style={styles.container}>
-      {!adRemoved && BannerAd && (
+      {!adRemoved && BannerAd && BANNER_ID !== '' && (
         <View style={styles.bannerContainer}>
           <BannerAd unitId={BANNER_ID} size={BannerAdSize.BANNER} />
         </View>
