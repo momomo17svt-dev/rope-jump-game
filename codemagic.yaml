@@ -1,19 +1,20 @@
 workflows:
-  ios-expo-release:
-    name: iOS Expo Release Build
-    max_build_duration: 120
+  ios-production:
+    name: iOS Production (TestFlight)
+    max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       groups:
-        # Codemagicの環境変数（Environment variables）で以下のグループを作成し、変数を設定してください
-        # 1. expoグループ: EAS_TOKEN (Expoのアクセストークン)
-        # 2. app_store_credentialsグループ: 
-        #    - APP_STORE_CONNECT_PRIVATE_KEY
-        #    - APP_STORE_CONNECT_KEY_IDENTIFIER
-        #    - APP_STORE_CONNECT_ISSUER_ID
         - expo
         - app_store_credentials
       node: 20
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     scripts:
       - name: Install dependencies
         script: |
@@ -26,7 +27,6 @@ workflows:
         script: |
           cd frontend
           export EXPO_TOKEN=$EAS_TOKEN
-          # CodemagicのMac環境上でローカルビルドを行うことでEASのキューを回避します
           eas build --platform ios --profile production --local --non-interactive --output=$CM_BUILD_DIR/app.ipa
     artifacts:
       - $CM_BUILD_DIR/app.ipa
