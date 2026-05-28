@@ -1,54 +1,45 @@
 workflows:
   ios-expo-release:
     name: iOS Expo Release Build
-    instance_type: mac_mini_m2
     max_build_duration: 120
+    instance_type: mac_mini_m2
     environment:
-      node_versions:
-        - 20.x
       groups:
-        # CodemagicのUIで「apple_credentials」という環境変数グループを作成し、
-        # App Store ConnectのAPIキーなどを設定します
-        - apple_credentials
+        # Codemagicの環境変数（Environment variables）で以下のグループを作成し、変数を設定してください
+        # 1. expoグループ: EAS_TOKEN (Expoのアクセストークン)
+        # 2. app_store_credentialsグループ: 
+        #    - APP_STORE_CONNECT_PRIVATE_KEY
+        #    - APP_STORE_CONNECT_KEY_IDENTIFIER
+        #    - APP_STORE_CONNECT_ISSUER_ID
+        - expo
+        - app_store_credentials
+      node: 20
     scripts:
       - name: Install dependencies
         script: |
           cd frontend
           npm install
-      - name: Expo prebuild
+      - name: Install EAS CLI
+        script: |
+          npm install -g eas-cli
+      - name: Build iOS .ipa with EAS local
         script: |
           cd frontend
-          npx expo prebuild --platform ios
-      - name: Install CocoaPods
-        script: |
-          cd frontend/ios
-          pod install
-      - name: Set up keychain to be used for codesigning
-        script: |
-          keychain initialize
-      - name: Fetch signing files
-        script: |
-          # バンドルIDを指定して証明書とプロファイルを自動取得します
-          app-store-connect fetch-signing-files "com.tatsunobu.ropejump" --type IOS_APP_STORE --create
-      - name: Add certificates to keychain
-        script: |
-          keychain add-certificates
-      - name: Set up code signing settings on Xcode project
-        script: |
-          cd frontend/ios
-          xcode-project use-profiles
-      - name: Build ipa for distribution
-        script: |
-          cd frontend/ios
-          WORKSPACE=$(ls -1 *.xcworkspace | head -n 1)
-          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
-          echo "Building Workspace: $WORKSPACE, Scheme: $SCHEME"
-          xcode-project build-ipa --workspace "$WORKSPACE" --scheme "$SCHEME"
+          export EXPO_TOKEN=$EAS_TOKEN
+          # CodemagicのMac環境上でローカルビルドを行うことでEASのキューを回避します
+          eas build --platform ios --profile production --local --non-interactive --output=$CM_BUILD_DIR/app.ipa
     artifacts:
-      - frontend/build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/app.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
-        auth: integration
-        # Trueにすると自動的にTestFlightにアップロードされます
-        submit_to_testflight: false
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+      email:
+        recipients:
+          - tatsunobu1111@gmail.com
+        notify:
+          success: true
+          failure: true
