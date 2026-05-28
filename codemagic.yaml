@@ -19,7 +19,7 @@ workflows:
       - name: Install dependencies
         script: |
           cd frontend
-          npm install
+          npm ci --legacy-peer-deps
       - name: Install EAS CLI
         script: |
           npm install -g eas-cli
@@ -27,6 +27,8 @@ workflows:
         script: |
           cd frontend
           export EXPO_TOKEN=$EAS_TOKEN
+          # EASビルド内部でnpmが失敗しないように環境変数を設定します
+          export NPM_CONFIG_LEGACY_PEER_DEPS=true
           eas build --platform ios --profile production --local --non-interactive --output=$CM_BUILD_DIR/app.ipa
     artifacts:
       - $CM_BUILD_DIR/app.ipa
