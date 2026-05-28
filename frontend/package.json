@@ -11,6 +11,7 @@
   "dependencies": {
     "expo": "~54.0.33",
     "expo-av": "~16.0.8",
+    "expo-build-properties": "^56.0.15",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.9",
     "expo-image-picker": "~17.0.11",
