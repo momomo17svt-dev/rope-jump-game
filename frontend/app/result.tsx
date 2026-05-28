@@ -39,11 +39,11 @@ export default function ResultScreen() {
   const { isLoaded, load, show, addAdEventListener } = useInterstitialAd(INTERSTITIAL_ID);
 
   useEffect(() => {
-    if (!adRemoved) load();
+    if (!adRemoved && INTERSTITIAL_ID !== '') load();
   }, [adRemoved]);
 
   useEffect(() => {
-    if (!adRemoved && isLoaded && ready) {
+    if (!adRemoved && isLoaded && ready && INTERSTITIAL_ID !== '') {
       show();
     }
   }, [isLoaded, ready, adRemoved]);
