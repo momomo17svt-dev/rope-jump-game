@@ -45,9 +45,11 @@ module.exports = function withFmtConsteval(config) {
       const anchor = 'post_install do |installer|';
       if (contents.includes(anchor)) {
         contents = contents.replace(anchor, `${anchor}\n${SNIPPET}`);
+        console.log('[withFmtConsteval] injected FMT_USE_CONSTEVAL=0 into post_install');
       } else {
-        // post_install が無い場合は target の直前/末尾に追加
+        // post_install が無い場合は末尾に追加
         contents += `\npost_install do |installer|\n${SNIPPET}\nend\n`;
+        console.log('[withFmtConsteval] appended new post_install with FMT_USE_CONSTEVAL=0');
       }
 
       fs.writeFileSync(podfilePath, contents);
