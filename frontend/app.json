@@ -64,12 +64,7 @@
           "cameraPermission": "アバター画像を設定するためにカメラを使用します。"
         }
       ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "ゲームの音声機能に使用します。"
-        }
-      ]
+      "expo-audio"
     ],
     "extra": {
       "router": {},

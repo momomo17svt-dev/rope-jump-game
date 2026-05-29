@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 
 const PLAY_TRACKS = [
   require('../assets/sounds/play/062_BPM132.mp3'),
@@ -9,43 +9,39 @@ const PLAY_TRACKS = [
 ];
 
 export function usePlayBGM() {
-  const playBGMRef = useRef<Audio.Sound | null>(null);
-  const wantsPlayBGMRef = useRef(false);
-  const isLoadingRef = useRef(false);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const wantsPlayRef = useRef(false);
 
   useEffect(() => {
     return () => {
-      playBGMRef.current?.unloadAsync();
-      playBGMRef.current = null;
+      try {
+        playerRef.current?.remove();
+      } catch {}
+      playerRef.current = null;
     };
   }, []);
 
   const start = () => {
-    wantsPlayBGMRef.current = true;
-    // 既に再生中／ロード中なら何もしない（同一セッションでトラックを継続させるため）
-    if (playBGMRef.current || isLoadingRef.current) return;
-    isLoadingRef.current = true;
-    const track = PLAY_TRACKS[Math.floor(Math.random() * PLAY_TRACKS.length)];
-    Audio.Sound.createAsync(track, { shouldPlay: false, isLooping: true, volume: 0.5 })
-      .then(({ sound }) => {
-        isLoadingRef.current = false;
-        if (!wantsPlayBGMRef.current) {
-          sound.unloadAsync();
-          return;
-        }
-        playBGMRef.current = sound;
-        sound.playAsync().catch(() => {});
-      })
-      .catch(() => {
-        isLoadingRef.current = false;
-      });
+    wantsPlayRef.current = true;
+    // 既に再生中なら何もしない（同一セッションでトラックを継続させるため）
+    if (playerRef.current) return;
+    try {
+      const track = PLAY_TRACKS[Math.floor(Math.random() * PLAY_TRACKS.length)];
+      const player = createAudioPlayer(track);
+      player.loop = true;
+      player.volume = 0.5;
+      playerRef.current = player;
+      player.play();
+    } catch {}
   };
 
   const stop = () => {
-    wantsPlayBGMRef.current = false;
-    const s = playBGMRef.current;
-    playBGMRef.current = null;
-    s?.stopAsync().then(() => s.unloadAsync()).catch(() => {});
+    wantsPlayRef.current = false;
+    const p = playerRef.current;
+    playerRef.current = null;
+    try {
+      p?.remove();
+    } catch {}
   };
 
   return { start, stop };
