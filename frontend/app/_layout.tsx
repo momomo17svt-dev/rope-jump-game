@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack, useSegments } from 'expo-router';
 import Purchases from '@/lib/purchasessafe';
-import { mobileAds } from '@/lib/adsafe';
 import { AdProvider } from '@/context/AdContext';
 import { useTopBGM } from '@/hooks/useTopBGM';
 import { usePlayBGM } from '@/hooks/usePlayBGM';
@@ -44,15 +43,13 @@ function PlayBGMController() {
 
 export default function RootLayout() {
   useEffect(() => {
-    if (mobileAds) {
-      try {
-        mobileAds().initialize().catch(() => {});
-      } catch {}
-    }
-    
+    // AdMob は本番広告IDが未設定（広告は描画されない）ため起動時に初期化しない。
+    // ネイティブ広告SDKは初回広告表示時に遅延初期化される。
     if (Platform.OS === 'ios' && Purchases) {
       const key = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
-      if (key && key !== 'your_revenuecat_ios_key_here') {
+      // RevenueCat の iOS 公開キーは "appl_" で始まる。不正な値で configure すると
+      // ネイティブ例外で起動クラッシュするため、形式が正しい場合のみ初期化する。
+      if (key.startsWith('appl_')) {
         try {
           Purchases.configure({ apiKey: key });
         } catch {}

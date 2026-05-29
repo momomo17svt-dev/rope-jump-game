@@ -1,49 +1,52 @@
 import { useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 
 export function useGameSounds() {
-  const jumpRef = useRef<Audio.Sound | null>(null);
-  const gameoverRef = useRef<Audio.Sound | null>(null);
+  const jumpRef = useRef<AudioPlayer | null>(null);
+  const gameoverRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
-    let jump: Audio.Sound | null = null;
-    let gameover: Audio.Sound | null = null;
+    let jump: AudioPlayer | null = null;
+    let gameover: AudioPlayer | null = null;
 
-    (async () => {
-      try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        ({ sound: jump } = await Audio.Sound.createAsync(
-          require('../assets/sounds/jump.wav'),
-          { shouldPlay: false }
-        ));
-        jumpRef.current = jump;
-
-        ({ sound: gameover } = await Audio.Sound.createAsync(
-          require('../assets/sounds/gameover.wav'),
-          { shouldPlay: false }
-        ));
-        gameoverRef.current = gameover;
-      } catch {
-        // 音源が読めなくてもゲームは動く
-      }
-    })();
+    try {
+      setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+      jump = createAudioPlayer(require('../assets/sounds/jump.wav'));
+      jumpRef.current = jump;
+      gameover = createAudioPlayer(require('../assets/sounds/gameover.wav'));
+      gameoverRef.current = gameover;
+    } catch {
+      // 音源が読めなくてもゲームは動く
+    }
 
     return () => {
-      jump?.unloadAsync();
-      gameover?.unloadAsync();
+      try {
+        jump?.remove();
+      } catch {}
+      try {
+        gameover?.remove();
+      } catch {}
+      jumpRef.current = null;
+      gameoverRef.current = null;
     };
   }, []);
 
   const playJump = () => {
-    const s = jumpRef.current;
-    if (!s) return;
-    s.setPositionAsync(0).then(() => s.playAsync()).catch(() => {});
+    const p = jumpRef.current;
+    if (!p) return;
+    try {
+      p.seekTo(0);
+      p.play();
+    } catch {}
   };
 
   const playGameover = () => {
-    const s = gameoverRef.current;
-    if (!s) return;
-    s.setPositionAsync(0).then(() => s.playAsync()).catch(() => {});
+    const p = gameoverRef.current;
+    if (!p) return;
+    try {
+      p.seekTo(0);
+      p.play();
+    } catch {}
   };
 
   return { playJump, playGameover };
