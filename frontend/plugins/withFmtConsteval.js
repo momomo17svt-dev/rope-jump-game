@@ -6,32 +6,33 @@ const path = require('path');
  * Expo config plugin: fmt の consteval コンパイルエラー対策。
  *
  * React Native 0.81 が同梱する fmt 11.0.2 は、新しい Xcode/Clang
- * (Xcode 16.3+ / Xcode 26) の厳格な consteval 評価で
+ * (Xcode 26) の consteval で
  * 「call to consteval function ... is not a constant expression」エラーになる。
- * GCC_PREPROCESSOR_DEFINITIONS / OTHER_CPLUSPLUSFLAGS に FMT_USE_CONSTEVAL=0 を
- * 追加して fmt の consteval 使用を無効化し、全 Pod ターゲットでビルドできるようにする。
  *
- * CNG (prebuild で ios/ を生成する) 構成のため、生成された Podfile の
- * post_install ブロックへ build settings の上書きを注入する。
- * 注入された Ruby は `pod install` 時に実行され、ログに [withFmtConsteval] を出力する。
+ * fmt 11.0.2 は base.h で FMT_USE_CONSTEVAL / FMT_CONSTEVAL を #ifndef ガード無しで
+ * 無条件に #define するため、-DFMT_USE_CONSTEVAL=0 等のコンパイラ定義では上書きできない
+ * (fmt 側の #define が勝つ)。そこで Pods 取得後 (post_install) に base.h を直接パッチして
+ * `#define FMT_CONSTEVAL consteval` を空マクロに置換し、consteval を無効化する。
+ *
+ * CNG 構成のため Podfile の post_install ブロックへこの処理を注入する。
+ * pod install 時に実行され、ログに [withFmtConsteval] を出力する。
  */
-const MARKER = 'FMT_USE_CONSTEVAL=0';
+const ANCHOR = 'post_install do |installer|';
 
 const SNIPPET = `
-    # withFmtConsteval: fix fmt consteval build error on newer Xcode/Clang
-    puts '[withFmtConsteval] applying ${MARKER} to all pod targets'
-    installer.pods_project.targets.each do |fmt_target|
-      fmt_target.build_configurations.each do |fmt_config|
-        defs = fmt_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
-        defs = [defs] unless defs.is_a?(Array)
-        defs << '${MARKER}' unless defs.include?('${MARKER}')
-        fmt_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
-
-        flags = fmt_config.build_settings['OTHER_CPLUSPLUSFLAGS'] || ['$(inherited)']
-        flags = [flags] unless flags.is_a?(Array)
-        flags << '-D${MARKER}' unless flags.include?('-D${MARKER}')
-        fmt_config.build_settings['OTHER_CPLUSPLUSFLAGS'] = flags
+    # withFmtConsteval: disable fmt consteval (broken under Xcode 26 Clang)
+    fmt_base = File.join(installer.sandbox.root.to_s, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base)
+      fmt_original = File.read(fmt_base)
+      fmt_patched = fmt_original.gsub('define FMT_CONSTEVAL consteval', 'define FMT_CONSTEVAL')
+      if fmt_patched != fmt_original
+        File.write(fmt_base, fmt_patched)
+        puts '[withFmtConsteval] patched fmt base.h: FMT_CONSTEVAL -> (empty)'
+      else
+        puts '[withFmtConsteval] fmt base.h already patched or pattern not found'
       end
+    else
+      puts "[withFmtConsteval] fmt base.h not found: #{fmt_base}"
     end
 `;
 
@@ -45,18 +46,17 @@ module.exports = function withFmtConsteval(config) {
       );
       let contents = fs.readFileSync(podfilePath, 'utf8');
 
-      if (contents.includes(MARKER)) {
+      if (contents.includes('withFmtConsteval')) {
         console.log('[withFmtConsteval] Podfile already patched, skipping');
         return config;
       }
 
-      const anchor = 'post_install do |installer|';
-      if (contents.includes(anchor)) {
-        contents = contents.replace(anchor, `${anchor}\n${SNIPPET}`);
-        console.log('[withFmtConsteval] injected into existing post_install');
+      if (contents.includes(ANCHOR)) {
+        contents = contents.replace(ANCHOR, `${ANCHOR}\n${SNIPPET}`);
+        console.log('[withFmtConsteval] injected fmt patch into existing post_install');
       } else {
         contents += `\npost_install do |installer|\n${SNIPPET}\nend\n`;
-        console.log('[withFmtConsteval] appended new post_install block');
+        console.log('[withFmtConsteval] appended new post_install with fmt patch');
       }
 
       fs.writeFileSync(podfilePath, contents);
