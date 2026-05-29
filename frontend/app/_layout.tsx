@@ -1,8 +1,10 @@
+import '@/lib/installErrorHandler';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Stack, useSegments } from 'expo-router';
 import Purchases from '@/lib/purchasessafe';
 import { AdProvider } from '@/context/AdContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useTopBGM } from '@/hooks/useTopBGM';
 import { usePlayBGM } from '@/hooks/usePlayBGM';
 
@@ -58,15 +60,17 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AdProvider>
-      <BGMController />
-      <PlayBGMController />
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="game" />
-        <Stack.Screen name="result" />
-        <Stack.Screen name="ranking" />
-      </Stack>
-    </AdProvider>
+    <ErrorBoundary>
+      <AdProvider>
+        <BGMController />
+        <PlayBGMController />
+        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="game" />
+          <Stack.Screen name="result" />
+          <Stack.Screen name="ranking" />
+        </Stack>
+      </AdProvider>
+    </ErrorBoundary>
   );
 }

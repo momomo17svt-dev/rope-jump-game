@@ -13,9 +13,14 @@ export function AdProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      await initDB();
-      const removed = await getAdRemoved();
-      setAdRemoved(removed);
+      try {
+        await initDB();
+        const removed = await getAdRemoved();
+        setAdRemoved(removed);
+      } catch (e) {
+        // DB初期化に失敗しても起動を止めない（広告非削除の既定で続行）
+        console.log('[AdContext] init failed', e);
+      }
     })();
   }, []);
 
