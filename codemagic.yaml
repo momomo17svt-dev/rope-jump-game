@@ -16,6 +16,11 @@ workflows:
           include: true
           source: true
     scripts:
+      - name: Show Xcode / macOS version
+        script: |
+          xcodebuild -version
+          sw_vers
+          ls /Applications | grep -i xcode || true
       - name: Install dependencies
         script: |
           cd frontend
