@@ -41,6 +41,11 @@ export function usePlayBGM() {
     wantsPlayRef.current = false;
     const p = playerRef.current;
     playerRef.current = null;
+    // ループ再生は remove だけだと止まりきらないことがあるため、先に pause してから remove。
+    // （TOP 画面でゲームBGMとTOP BGMが重複する不具合の対策）
+    try {
+      p?.pause();
+    } catch {}
     try {
       p?.remove();
     } catch {}
