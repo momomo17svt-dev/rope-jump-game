@@ -42,14 +42,6 @@
       "expo-router",
       "expo-sqlite",
       [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "アバター画像を設定するために写真ライブラリを使用します。",
