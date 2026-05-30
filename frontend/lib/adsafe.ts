@@ -1,11 +1,22 @@
-// AdMob は本番設定が未完了のため一時的に無効化している。
-// （react-native-google-mobile-ads をアンインストールし、起動時クラッシュの
-//  原因切り分けを行うための暫定対応。設定が整い次第ネイティブ再導入する。）
+let BannerAdRaw: any = null;
+let BannerAdSizeRaw: any = { BANNER: 'BANNER' };
+let TestIdsRaw: any = { BANNER: '', INTERSTITIAL: '' };
+let useInterstitialAdRaw: any = null;
+let mobileAdsRaw: any = null;
 
-export const BannerAd: any = null;
-export const BannerAdSize: any = { BANNER: 'BANNER' };
-export const TestIds: any = { BANNER: '', INTERSTITIAL: '' };
-export const mobileAds: any = null;
+try {
+  const m = require('react-native-google-mobile-ads');
+  BannerAdRaw = m.BannerAd;
+  BannerAdSizeRaw = m.BannerAdSize;
+  TestIdsRaw = m.TestIds;
+  useInterstitialAdRaw = m.useInterstitialAd;
+  mobileAdsRaw = m.default;
+} catch {}
+
+export const BannerAd = BannerAdRaw;
+export const BannerAdSize = BannerAdSizeRaw;
+export const TestIds = TestIdsRaw;
+export const mobileAds = mobileAdsRaw;
 
 const stubInterstitial = () => ({
   isLoaded: false,
@@ -13,10 +24,9 @@ const stubInterstitial = () => ({
   show: () => {},
   addAdEventListener: () => () => {},
 });
-
 export const useInterstitialAd: (unitId: string) => {
   isLoaded: boolean;
   load: () => void;
   show: () => void;
   addAdEventListener: (...args: any[]) => () => void;
-} = stubInterstitial;
+} = useInterstitialAdRaw ?? stubInterstitial;
