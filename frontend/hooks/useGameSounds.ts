@@ -33,23 +33,22 @@ export function useGameSounds() {
     };
   }, []);
 
-  const playJump = () => {
-    const p = jumpRef.current;
+  // seekTo は非同期。位置を 0 に戻し「終わってから」play しないと、再生位置が末尾の
+  // ままになって無音になることがあるため、seek 完了後に play する。
+  const replay = (p: AudioPlayer | null) => {
     if (!p) return;
     try {
-      p.seekTo(0);
-      p.play();
+      const seeked = p.seekTo(0) as unknown as Promise<void> | undefined;
+      if (seeked && typeof seeked.then === 'function') {
+        seeked.then(() => { try { p.play(); } catch {} }).catch(() => {});
+      } else {
+        p.play();
+      }
     } catch {}
   };
 
-  const playGameover = () => {
-    const p = gameoverRef.current;
-    if (!p) return;
-    try {
-      p.seekTo(0);
-      p.play();
-    } catch {}
-  };
+  const playJump = () => replay(jumpRef.current);
+  const playGameover = () => replay(gameoverRef.current);
 
   return { playJump, playGameover };
 }
