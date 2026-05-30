@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
+import { AUDIO_ENABLED } from '../lib/audioConfig';
 
 export function useTopBGM() {
   const playerRef = useRef<AudioPlayer | null>(null);
   const wantsToPlayRef = useRef(false);
 
   useEffect(() => {
+    if (!AUDIO_ENABLED) return;
     let player: AudioPlayer | null = null;
 
     try {
@@ -31,6 +33,7 @@ export function useTopBGM() {
   }, []);
 
   const start = () => {
+    if (!AUDIO_ENABLED) return;
     wantsToPlayRef.current = true;
     try {
       playerRef.current?.play();
