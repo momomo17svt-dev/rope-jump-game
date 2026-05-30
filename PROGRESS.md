@@ -148,8 +148,35 @@
 
 ### 6-3. ストア申請
 - [ ] Apple Developer Program 登録（年 $99）
-- [ ] EAS Build（`eas build --platform ios --profile production`）で本番 IPA を作成
-- [ ] TestFlight で実機テスト（広告表示・課金フロー確認）
+- [x] Codemagic + EAS Build (`--local`) で本番 IPA をビルド・TestFlight へ配信
+- [~] TestFlight で実機テスト（起動・BGM/SE・UI は確認済み。広告/課金は本番キー設定後に確認）
 - [ ] App Store Connect でアプリ情報・スクリーンショット・プライバシーポリシーを整備
 - [ ] App Store 審査申請
 - [ ] ピクセルアートへのグラフィック差し替え（申請前推奨）
+
+---
+
+## Phase 7: iOS 実機ビルド安定化 & UI 整備（2026-05-30）
+
+### 7-1. 起動クラッシュの解消
+- [x] 根本原因特定：`.env` が `.gitignore` 除外で Codemagic ビルドに含まれず
+      `EXPO_PUBLIC_API_BASE_URL` 未定義 → `API_BASE=''` → `fetch('/health')` が
+      相対URLで `TypeError: Invalid URL` を同期throw → 起動時 RCTFatal/abort
+- [x] `lib/api.ts` で `API_BASE` を本番URLフォールバック付きで一元化（空にならない）
+- [x] `lib/installErrorHandler` + `components/ErrorBoundary` で未捕捉エラーを画面表示（診断網）
+- [x] Xcode 26 で RN0.81 同梱 fmt 11.0.2 が consteval でビルド不可 →
+      config plugin `withFmtConsteval` で `Pods/fmt/include/fmt/base.h` をパッチ
+
+### 7-2. 音声
+- [x] 非推奨 `expo-av` → `expo-audio` へ移行（TopBGM / PlayBGM / GameSounds）
+- [x] TOP画面でのゲームBGM重複を修正（停止時に pause→remove）
+- [x] ジャンプ音の鳴り損ねを修正（`seekTo(0)` 完了後に `play`）
+
+### 7-3. 広告枠・課金
+- [x] `components/BannerSlot` でバナー枠を事前確保＋レスポンシブ（ANCHORED_ADAPTIVE）
+- [x] 広告削除購入時は枠ごと非表示（買い切りは広告削除のみ）
+
+### 7-4. 設定画面
+- [x] 「アプリについて」追加：アプリを評価する（App Store）/ プライバシーポリシー /
+      利用規約 / バージョン表示
+- [x] アプリアイコン表示＋クレジット/謝辞（BGMer）を追加。内容は `lib/credits.ts` に一元化
