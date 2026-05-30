@@ -7,8 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
-
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+import { API_BASE } from '@/lib/api';
 
 export default function SettingsScreen() {
   const router = useRouter();
