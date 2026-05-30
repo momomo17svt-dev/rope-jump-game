@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
+
+const PRIVACY_URL = 'https://rope-jump-game.netlify.app/privacy';
+const TERMS_URL = 'https://rope-jump-game.netlify.app/terms';
+// App Store のレビュー（評価）作成画面を直接開く。id は App Store Connect のアプリID。
+const REVIEW_URL = 'https://apps.apple.com/app/id6774147200?action=write-review';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+
+const openURL = (url: string) => {
+  Linking.openURL(url).catch(() => {});
+};
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -291,6 +303,51 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {/* アプリ情報 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>アプリについて</Text>
+
+        <View style={styles.appHeader}>
+          <Image source={APP_ICON} style={styles.appIcon} resizeMode="contain" />
+          <Text style={styles.appName}>大縄跳びサバイバル</Text>
+          <Text style={styles.appVersionSmall}>v{APP_VERSION}</Text>
+        </View>
+
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(REVIEW_URL)}>
+          <Text style={styles.linkLabel}>アプリを評価する</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(PRIVACY_URL)}>
+          <Text style={styles.linkLabel}>プライバシーポリシー</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(TERMS_URL)}>
+          <Text style={styles.linkLabel}>利用規約</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+
+        {/* クレジット / 謝辞（内容は lib/credits.ts で編集） */}
+        <View style={styles.creditsBox}>
+          <Text style={styles.creditsHeading}>クレジット / 謝辞</Text>
+          <Text style={styles.creditsIntro}>{CREDITS_INTRO}</Text>
+          {CREDITS.map((c, i) => (
+            <View key={i} style={styles.creditEntry}>
+              <Text style={styles.creditRole}>{c.role}</Text>
+              {c.url ? (
+                <TouchableOpacity onPress={() => openURL(c.url!)}>
+                  <Text style={styles.creditNameLink}>{c.name} ↗</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.creditName}>{c.name}</Text>
+              )}
+              {c.works && c.works.length > 0 && (
+                <Text style={styles.creditWorks}>{c.works.join(' / ')}</Text>
+              )}
+            </View>
+          ))}
+        </View>
+      </View>
+
       {/* 保存 */}
       <TouchableOpacity
         style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
@@ -500,5 +557,86 @@ const styles = StyleSheet.create({
     color: '#6adf6a',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a4e',
+  },
+  linkLabel: {
+    color: '#e0e0ff',
+    fontSize: 15,
+  },
+  linkChevron: {
+    color: '#666688',
+    fontSize: 20,
+  },
+  versionValue: {
+    color: '#888899',
+    fontSize: 15,
+  },
+  appHeader: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  appIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  appName: {
+    color: '#e0e0ff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  appVersionSmall: {
+    color: '#888899',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  creditsBox: {
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a4e',
+  },
+  creditsHeading: {
+    color: '#aaaacc',
+    fontSize: 13,
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  creditsIntro: {
+    color: '#888899',
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  creditEntry: {
+    marginBottom: 12,
+  },
+  creditRole: {
+    color: '#888899',
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  creditName: {
+    color: '#e0e0ff',
+    fontSize: 15,
+  },
+  creditNameLink: {
+    color: '#4a90d9',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  creditWorks: {
+    color: '#aaaacc',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
