@@ -3,13 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'reac
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
-import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
-
-const BANNER_ID = __DEV__
-  ? TestIds.BANNER
-  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID ?? '');
+import { BannerSlot } from '@/components/BannerSlot';
 
 export default function TitleScreen() {
   const router = useRouter();
@@ -88,67 +84,67 @@ export default function TitleScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {!adRemoved && BannerAd && BANNER_ID !== '' && (
-        <View style={styles.bannerContainer}>
-          <BannerAd unitId={BANNER_ID} size={BannerAdSize.BANNER} />
+    <View style={styles.root}>
+      <View style={styles.content}>
+        <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
+          <Text style={styles.settingsIcon}>⚙</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.title}>大縄跳びサバイバル</Text>
+
+        {bestScore !== null && (
+          <Text style={styles.bestScore}>自己ベスト: {bestScore} 回</Text>
+        )}
+
+        <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/game')}>
+          <Text style={styles.buttonText}>TAP TO START</Text>
+        </TouchableOpacity>
+
+        <View style={styles.secondaryRow}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
+            <Text style={styles.secondaryButtonText}>ランキング</Text>
+          </TouchableOpacity>
+          <Text style={styles.secondarySep}>|</Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/history')}>
+            <Text style={styles.secondaryButtonText}>履歴</Text>
+          </TouchableOpacity>
         </View>
-      )}
-      <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-        <Text style={styles.settingsIcon}>⚙</Text>
-      </TouchableOpacity>
 
-      <Text style={styles.title}>大縄跳びサバイバル</Text>
-
-      {bestScore !== null && (
-        <Text style={styles.bestScore}>自己ベスト: {bestScore} 回</Text>
-      )}
-
-      <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/game')}>
-        <Text style={styles.buttonText}>TAP TO START</Text>
-      </TouchableOpacity>
-
-      <View style={styles.secondaryRow}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/ranking')}>
-          <Text style={styles.secondaryButtonText}>ランキング</Text>
-        </TouchableOpacity>
-        <Text style={styles.secondarySep}>|</Text>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/history')}>
-          <Text style={styles.secondaryButtonText}>履歴</Text>
-        </TouchableOpacity>
+        {!showResetConfirm ? (
+          <TouchableOpacity style={styles.resetButton} onPress={() => setShowResetConfirm(true)}>
+            <Text style={styles.resetButtonText}>データをリセット</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.resetConfirm}>
+            <Text style={styles.resetConfirmText}>プレイヤー名とスコア履歴を削除します</Text>
+            <View style={styles.resetConfirmButtons}>
+              <TouchableOpacity style={styles.resetCancelButton} onPress={() => setShowResetConfirm(false)}>
+                <Text style={styles.resetCancelText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.resetDestructiveButton}
+                onPress={async () => {
+                  setShowResetConfirm(false);
+                  const user = await getLocalUser();
+                  if (user) {
+                    fetch(`${API_BASE}/api/profile?device_id=${encodeURIComponent(user.device_id)}`, {
+                      method: 'DELETE',
+                    }).catch(() => {});
+                  }
+                  await clearLocalData();
+                  setBestScore(null);
+                  setShowSetup(true);
+                }}
+              >
+                <Text style={styles.resetDestructiveText}>削除する</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
-      {!showResetConfirm ? (
-        <TouchableOpacity style={styles.resetButton} onPress={() => setShowResetConfirm(true)}>
-          <Text style={styles.resetButtonText}>データをリセット</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.resetConfirm}>
-          <Text style={styles.resetConfirmText}>プレイヤー名とスコア履歴を削除します</Text>
-          <View style={styles.resetConfirmButtons}>
-            <TouchableOpacity style={styles.resetCancelButton} onPress={() => setShowResetConfirm(false)}>
-              <Text style={styles.resetCancelText}>キャンセル</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.resetDestructiveButton}
-              onPress={async () => {
-                setShowResetConfirm(false);
-                const user = await getLocalUser();
-                if (user) {
-                  fetch(`${API_BASE}/api/profile?device_id=${encodeURIComponent(user.device_id)}`, {
-                    method: 'DELETE',
-                  }).catch(() => {});
-                }
-                await clearLocalData();
-                setBestScore(null);
-                setShowSetup(true);
-              }}
-            >
-              <Text style={styles.resetDestructiveText}>削除する</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      {/* 広告枠を下部にあらかじめ確保（adRemoved 購入済みなら枠ごと非表示） */}
+      <BannerSlot adRemoved={adRemoved} />
     </View>
   );
 }
@@ -160,10 +156,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bannerContainer: {
-    position: 'absolute',
-    bottom: 0,
-    alignSelf: 'center',
+  root: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 36,
