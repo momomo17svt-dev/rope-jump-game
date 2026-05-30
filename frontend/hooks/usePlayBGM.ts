@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { AUDIO_ENABLED } from '../lib/audioConfig';
 
 const PLAY_TRACKS = [
   require('../assets/sounds/play/062_BPM132.mp3'),
@@ -22,6 +23,7 @@ export function usePlayBGM() {
   }, []);
 
   const start = () => {
+    if (!AUDIO_ENABLED) return;
     wantsPlayRef.current = true;
     // 既に再生中なら何もしない（同一セッションでトラックを継続させるため）
     if (playerRef.current) return;

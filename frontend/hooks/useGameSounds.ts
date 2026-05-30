@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
+import { AUDIO_ENABLED } from '../lib/audioConfig';
 
 export function useGameSounds() {
   const jumpRef = useRef<AudioPlayer | null>(null);
   const gameoverRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
+    if (!AUDIO_ENABLED) return;
     let jump: AudioPlayer | null = null;
     let gameover: AudioPlayer | null = null;
 
