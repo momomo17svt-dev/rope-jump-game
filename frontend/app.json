@@ -50,14 +50,6 @@
         }
       ],
       [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
-          "userTrackingUsageDescription": "お客様に合わせた広告を表示するために使用します。"
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "アバター画像を設定するために写真ライブラリを使用します。",
