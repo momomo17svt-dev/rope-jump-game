@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+
+const PRIVACY_URL = 'https://rope-jump-game.netlify.app/privacy';
+const TERMS_URL = 'https://rope-jump-game.netlify.app/terms';
+// App Store のレビュー（評価）作成画面を直接開く。id は App Store Connect のアプリID。
+const REVIEW_URL = 'https://apps.apple.com/app/id6774147200?action=write-review';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+
+const openURL = (url: string) => {
+  Linking.openURL(url).catch(() => {});
+};
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -291,6 +302,27 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {/* アプリ情報 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>アプリについて</Text>
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(REVIEW_URL)}>
+          <Text style={styles.linkLabel}>アプリを評価する</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(PRIVACY_URL)}>
+          <Text style={styles.linkLabel}>プライバシーポリシー</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(TERMS_URL)}>
+          <Text style={styles.linkLabel}>利用規約</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.linkRow}>
+          <Text style={styles.linkLabel}>バージョン</Text>
+          <Text style={styles.versionValue}>{APP_VERSION}</Text>
+        </View>
+      </View>
+
       {/* 保存 */}
       <TouchableOpacity
         style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
@@ -500,5 +532,26 @@ const styles = StyleSheet.create({
     color: '#6adf6a',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a4e',
+  },
+  linkLabel: {
+    color: '#e0e0ff',
+    fontSize: 15,
+  },
+  linkChevron: {
+    color: '#666688',
+    fontSize: 20,
+  },
+  versionValue: {
+    color: '#888899',
+    fontSize: 15,
   },
 });
