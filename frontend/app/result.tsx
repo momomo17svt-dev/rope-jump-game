@@ -4,8 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getBestScore, saveScore, getLocalUser } from '@/db/database';
 import { useInterstitialAd, TestIds } from '@/lib/adsafe';
 import { useAd } from '@/context/AdContext';
-
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+import { API_BASE } from '@/lib/api';
 
 const INTERSTITIAL_ID = __DEV__
   ? TestIds.INTERSTITIAL

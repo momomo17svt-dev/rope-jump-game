@@ -4,4 +4,4 @@
 //
 // false: BGM・効果音をすべて無効化（起動クラッシュの切り分け用）
 // true : 通常どおり音声を再生
-export const AUDIO_ENABLED = false;
+export const AUDIO_ENABLED = true;

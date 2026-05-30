@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { getLocalUser } from '@/db/database';
+import { API_BASE } from '@/lib/api';
 
 type Period = 'all' | 'weekly';
 
@@ -18,8 +19,6 @@ type RankingEntry = {
   user_name: string;
   score: number;
 };
-
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 export default function RankingScreen() {
   const router = useRouter();
