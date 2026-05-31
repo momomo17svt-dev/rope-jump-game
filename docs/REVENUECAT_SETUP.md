@@ -7,6 +7,10 @@
 - 連携：RevenueCat（レシート検証・購入状態管理） × App Store Connect（IAP本体）
 - SDK：`react-native-purchases` v10（**StoreKit 2**。In-App Purchase Key が必須）
 
+> 📷 **スクリーンショットについて**：各手順の画像は `docs/images/revenuecat/` に置く。
+> 画像が未配置だとリンク切れ表示になる。保存するファイル名は
+> [docs/images/revenuecat/README.md](images/revenuecat/README.md) の対応表を参照。
+
 > ⚠️ コードは「**有効な entitlement が1つでもあれば広告削除**」と判定する（`AdContext.tsx`）。
 > entitlement 名は自由でよい。購入時は **`offerings.current` の先頭パッケージ**を購入する。
 
@@ -40,8 +44,12 @@
 - App Store Connect → **ビジネス → 契約** で確認。未締結なら締結（銀行口座・税務情報の登録が必要）。
 - これが無いと RevenueCat 連携も購入テストもできない。
 
+![App Store Connect アプリ情報](images/revenuecat/01-asc-app-info.png)
+
 ### 1-2. IAP `remove_ads` を作成
 App Store Connect → 対象アプリ → 左メニュー **収益化 → アプリ内購入** → **「＋」**
+
+![App Store Connect アプリ内購入一覧](images/revenuecat/02-asc-iap-list.png)
 - **タイプ**：非消耗型（Non-Consumable）
 - **製品ID**：`remove_ads`（※後で変更不可。RevenueCat 側と完全一致させる）
 - **参照名**：広告削除
@@ -60,6 +68,8 @@ App Store Connect → 対象アプリ → 左メニュー **収益化 → アプ
 左メニュー **Apps（または Project settings → Apps）→ ＋ New → App Store**
 （画面名：**New App Store app**）
 
+![RevenueCat New App Store app](images/revenuecat/03-rc-new-appstore-app.png)
+
 - **App name**：大縄跳びサバイバル (App Store)
 - **App Bundle ID**：`com.tatsunobu.ropejump`（Xcode/アプリ設定と一致）
 - **In-app purchase key configuration**（StoreKit 2 で必須）：
@@ -77,6 +87,8 @@ App Store Connect → 対象アプリ → 左メニュー **収益化 → アプ
 左メニュー **Product catalog → Products → ＋ New product**
 （画面名：**New Product**）
 
+![RevenueCat New Product](images/revenuecat/04-rc-new-product.png)
+
 - **Identifier**：`remove_ads`（App Store Connect の製品IDと完全一致）
 - **Display name**：広告削除
 - **Name（顧客向け）**：広告を削除
@@ -84,6 +96,8 @@ App Store Connect → 対象アプリ → 左メニュー **収益化 → アプ
   - 選ぶと Subscription settings / Duration / Pricing は不要になる
 - 対象 **App = 大縄跳びサバイバル (App Store)** の配下に作成する（**Test Store ではない**）
 - **Create Product**
+
+![RevenueCat Products 一覧](images/revenuecat/05-rc-products.png)
 
 > ⚠️ Products 一覧で **Status「Could not check」** が出るのは、App Store Connect 側の IAP が
 > 未完成（メタデータ不足）か、Apple への反映待ち（〜数時間）。1-2 を仕上げれば解消する。
@@ -94,6 +108,9 @@ App Store Connect → 対象アプリ → 左メニュー **収益化 → アプ
 ## 4. RevenueCat：Entitlements（権利）
 
 左メニュー **Product catalog → Entitlements** → 新規作成
+
+![RevenueCat Entitlements](images/revenuecat/06-rc-entitlement.png)
+
 - 識別子：任意（このアプリでは「大縄跳びサバイバル Pro」。`ads_removed` 等でも可）
 - **Associated products → Attach** で **`remove_ads`（App Store）を紐づける**
 
@@ -106,6 +123,8 @@ App Store Connect → 対象アプリ → 左メニュー **収益化 → アプ
 
 左メニュー **Product catalog → Offerings**
 （画面名：**New Offering** / 既存なら **Edit**）
+
+![RevenueCat New Offering](images/revenuecat/07-rc-new-offering.png)
 
 - **Identifier**：`default`（SDKからアクセスする識別子。後で変更不可）
 - **Display Name**：広告削除
