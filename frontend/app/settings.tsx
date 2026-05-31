@@ -9,6 +9,7 @@ import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+import { makeAvatarThumb } from '@/lib/avatar';
 import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
 
 const PRIVACY_URL = 'https://rope-jump-game.netlify.app/privacy';
@@ -84,6 +85,10 @@ export default function SettingsScreen() {
   };
 
   const handlePurchaseRemoveAds = async () => {
+    if (!Purchases) {
+      Alert.alert('エラー', '現在この環境では購入できません');
+      return;
+    }
     setPurchasing(true);
     try {
       const offerings = await Purchases.getOfferings();
@@ -105,6 +110,10 @@ export default function SettingsScreen() {
   };
 
   const handleRestorePurchases = async () => {
+    if (!Purchases) {
+      Alert.alert('エラー', '現在この環境では復元できません');
+      return;
+    }
     setPurchasing(true);
     try {
       const info = await Purchases.restorePurchases();
@@ -151,15 +160,19 @@ export default function SettingsScreen() {
         }
       }
 
-      await updateUserName(trimmed);
-      await updateAvatarUris(standUri, jumpUri);
+      // 立ち絵アバターのサムネ（base64）を生成。ランキング表示用にローカル保存し、
+      // サーバにも反映する。デフォルト絵（standUri=null）なら null。
+      const thumb = await makeAvatarThumb(standUri);
 
-      // ランキングのユーザー名のみ更新（last_played_at は変えない）
+      await updateUserName(trimmed);
+      await updateAvatarUris(standUri, jumpUri, thumb);
+
+      // ランキングのユーザー名とアバターを更新（last_played_at は変えない）
       if (user) {
         fetch(`${API_BASE}/api/profile`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: user.device_id, user_name: trimmed }),
+          body: JSON.stringify({ device_id: user.device_id, user_name: trimmed, avatar: thumb }),
         }).catch(() => {});
       }
 

@@ -6,6 +6,7 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,11 @@ type RankingEntry = {
   rank: number;
   user_name: string;
   score: number;
+  avatar?: string | null;
 };
+
+// カスタムアバター未設定（avatar が無い）プレイヤーに使うデフォルトの立ち絵
+const DEFAULT_AVATAR = require('../assets/figure_stand_front.png');
 
 export default function RankingScreen() {
   const router = useRouter();
@@ -63,6 +68,10 @@ export default function RankingScreen() {
         <Text style={[styles.cell, styles.rankCell, item.rank <= 3 && styles.topRankText]}>
           {rankLabel}
         </Text>
+        <Image
+          style={styles.avatar}
+          source={item.avatar ? { uri: `data:image/jpeg;base64,${item.avatar}` } : DEFAULT_AVATAR}
+        />
         <Text style={[styles.cell, styles.nameCell, isMe && styles.myText]} numberOfLines={1}>
           {item.user_name}
         </Text>
@@ -99,6 +108,7 @@ export default function RankingScreen() {
 
       <View style={styles.tableHeader}>
         <Text style={[styles.headerCell, styles.rankCell]}>順位</Text>
+        <View style={styles.avatarSpacer} />
         <Text style={[styles.headerCell, styles.nameCell]}>プレイヤー</Text>
         <Text style={[styles.headerCell, styles.scoreCell]}>スコア</Text>
       </View>
@@ -254,6 +264,17 @@ const styles = StyleSheet.create({
   rankCell: {
     width: 52,
     textAlign: 'center',
+  },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: '#2a2a4e',
+    resizeMode: 'cover',
+  },
+  avatarSpacer: {
+    width: 38, // avatar(30) + marginRight(8)
   },
   nameCell: {
     flex: 1,

@@ -180,3 +180,17 @@
 - [x] 「アプリについて」追加：アプリを評価する（App Store）/ プライバシーポリシー /
       利用規約 / バージョン表示
 - [x] アプリアイコン表示＋クレジット/謝辞（BGMer）を追加。内容は `lib/credits.ts` に一元化
+
+### 7-5. 公開準備（2026-05-31）
+- [x] アプリアイコンをマルチーズがなわとびするデザインに確定（icon/adaptive/splash）。
+      中身が JPEG だった3アセットを真の不透明 PNG（1024x1024 RGB）へ変換
+- [x] ATT（App Tracking Transparency）対応：`expo-tracking-transparency` 導入、
+      起動時に許可要求（`lib/tracking.ts` で安全ラップ）
+- [x] 週間ランキング欠落バグ修正：スコア送信ゲートを撤去し常時送信（`score_history` を確実記録）
+- [x] 広告削除フラグの自動同期：起動時に RevenueCat の entitlement から `ad_removed` を復元
+      （再インストール／リセットでも購入が自動復活。configure は AdContext に集約）
+- [x] `supportsTablet: false`（iPad 対応オフで審査を簡素化）
+- [ ] AdMob 本番 App ID / 広告ユニット ID を設定（コンソール作業＋Codemagic env）
+- [ ] ATT/UMP の同意フロー詳細・プライバシー栄養表示の申告
+- [ ] RevenueCat 本番キー・IAP商品 `remove_ads`・Offering 設定（コンソール作業）
+- [ ] ランキングへのアバター画像表示（圧縮画像をテーブル列に格納する方針・実装は未着手）

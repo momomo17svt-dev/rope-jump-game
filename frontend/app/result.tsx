@@ -10,14 +10,19 @@ const INTERSTITIAL_ID = __DEV__
   ? TestIds.INTERSTITIAL
   : (process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID ?? '');
 
-async function postScoreToServer(deviceId: string, userName: string, score: number): Promise<void> {
+async function postScoreToServer(
+  deviceId: string,
+  userName: string,
+  score: number,
+  avatar: string | null
+): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     await fetch(`${API_BASE}/api/scores`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: deviceId, user_name: userName, score }),
+      body: JSON.stringify({ device_id: deviceId, user_name: userName, score, avatar }),
       signal: controller.signal,
     });
   } finally {
@@ -61,25 +66,12 @@ export default function ResultScreen() {
         await saveScore(score);
       }
 
+      // スコアは常にサーバへ送信する。サーバ側 upsert は device_id ごとに
+      // 最高スコアだけを保持し、同時に score_history へ1行追加する。
+      // （以前は「全体100位以内に入る時だけ送信」していたが、それだと
+      //  score_history が記録されず週間ランキングからスコアが欠落していた）
       if (score > 0 && user) {
-        (async () => {
-          try {
-            const res = await fetch(`${API_BASE}/api/rankings`);
-            if (res.ok) {
-              const rankings: { rank: number; user_name: string; score: number }[] = await res.json();
-              const qualifies =
-                rankings.length < 100 ||
-                score > rankings[rankings.length - 1].score;
-              if (qualifies) {
-                postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-              }
-            } else {
-              postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-            }
-          } catch {
-            postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-          }
-        })();
+        postScoreToServer(user.device_id, user.user_name, score, user.avatar_thumb).catch(() => {});
       }
 
       if (!cancelled) setReady(true);

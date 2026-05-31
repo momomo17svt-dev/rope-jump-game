@@ -21,6 +21,10 @@ const (
 	maxUserNameRunes = 12
 	maxScore         = 1_000_000
 	rankingLimit     = 100
+	// アバターは 64x64 JPEG の base64。通常数KBだが余裕を持って上限を設定する。
+	maxAvatarBytes = 64 * 1024
+	// アバター base64 が乗るのでリクエストボディ上限を引き上げる。
+	maxRequestBytes = 128 * 1024
 )
 
 func main() {
@@ -88,14 +92,15 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 type postScoreRequest struct {
-	DeviceID string `json:"device_id"`
-	UserName string `json:"user_name"`
-	Score    int    `json:"score"`
+	DeviceID string  `json:"device_id"`
+	UserName string  `json:"user_name"`
+	Score    int     `json:"score"`
+	Avatar   *string `json:"avatar"`
 }
 
 func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
 
@@ -109,7 +114,7 @@ func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if err := db.InsertScore(r.Context(), pool, req.DeviceID, req.UserName, req.Score); err != nil {
+		if err := db.InsertScore(r.Context(), pool, req.DeviceID, req.UserName, req.Score, req.Avatar); err != nil {
 			log.Printf("upsert error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")
 			return
@@ -132,17 +137,21 @@ func validateScoreRequest(req postScoreRequest) string {
 	if req.Score < 0 || req.Score > maxScore {
 		return "invalid score"
 	}
+	if req.Avatar != nil && len(*req.Avatar) > maxAvatarBytes {
+		return "invalid avatar"
+	}
 	return ""
 }
 
 type patchProfileRequest struct {
-	DeviceID string `json:"device_id"`
-	UserName string `json:"user_name"`
+	DeviceID string  `json:"device_id"`
+	UserName string  `json:"user_name"`
+	Avatar   *string `json:"avatar"`
 }
 
 func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
 
@@ -159,7 +168,11 @@ func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid user_name")
 			return
 		}
-		if err := db.UpdateProfile(r.Context(), pool, req.DeviceID, req.UserName); err != nil {
+		if req.Avatar != nil && len(*req.Avatar) > maxAvatarBytes {
+			writeError(w, http.StatusBadRequest, "invalid avatar")
+			return
+		}
+		if err := db.UpdateProfile(r.Context(), pool, req.DeviceID, req.UserName, req.Avatar); err != nil {
 			log.Printf("update profile error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")
 			return
