@@ -1,11 +1,11 @@
 import { View, useWindowDimensions, StyleSheet } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
+import { ADMOB_IOS_BANNER_ID } from '@/lib/adsConfig';
 
-// 本番バナー広告ユニットID。開発時はテストID、本番は .env / Codemagic の値。
-// 未設定（空）でも枠だけは確保する（レイアウトのガタつき防止）。
+// 開発時はテストID、本番は committed な本番ユニットID（env があれば優先）。
 const BANNER_ID = __DEV__
   ? TestIds.BANNER
-  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID ?? '');
+  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID || ADMOB_IOS_BANNER_ID);
 
 /**
  * 下部に広告枠を「あらかじめ確保」する再利用コンポーネント。
