@@ -1,8 +1,7 @@
 import '@/lib/installErrorHandler';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
 import { Stack, useSegments } from 'expo-router';
-import Purchases from '@/lib/purchasessafe';
+import { requestTrackingPermission } from '@/lib/tracking';
 import { AdProvider } from '@/context/AdContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useTopBGM } from '@/hooks/useTopBGM';
@@ -45,18 +44,10 @@ function PlayBGMController() {
 
 export default function RootLayout() {
   useEffect(() => {
-    // AdMob は本番広告IDが未設定（広告は描画されない）ため起動時に初期化しない。
-    // ネイティブ広告SDKは初回広告表示時に遅延初期化される。
-    if (Platform.OS === 'ios' && Purchases) {
-      const key = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
-      // RevenueCat の iOS 公開キーは "appl_" で始まる。不正な値で configure すると
-      // ネイティブ例外で起動クラッシュするため、形式が正しい場合のみ初期化する。
-      if (key.startsWith('appl_')) {
-        try {
-          Purchases.configure({ apiKey: key });
-        } catch {}
-      }
-    }
+    // 広告（IDFA）利用のため App Tracking Transparency の許可を要求する。
+    // ・RevenueCat の configure / 購入状態同期は AdProvider 側で実施。
+    // ・AdMob は本番広告ID未設定時は描画されず、初回広告表示時に遅延初期化される。
+    requestTrackingPermission();
   }, []);
 
   return (

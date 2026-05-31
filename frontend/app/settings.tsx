@@ -84,6 +84,10 @@ export default function SettingsScreen() {
   };
 
   const handlePurchaseRemoveAds = async () => {
+    if (!Purchases) {
+      Alert.alert('エラー', '現在この環境では購入できません');
+      return;
+    }
     setPurchasing(true);
     try {
       const offerings = await Purchases.getOfferings();
@@ -105,6 +109,10 @@ export default function SettingsScreen() {
   };
 
   const handleRestorePurchases = async () => {
+    if (!Purchases) {
+      Alert.alert('エラー', '現在この環境では復元できません');
+      return;
+    }
     setPurchasing(true);
     try {
       const info = await Purchases.restorePurchases();

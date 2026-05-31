@@ -61,25 +61,12 @@ export default function ResultScreen() {
         await saveScore(score);
       }
 
+      // スコアは常にサーバへ送信する。サーバ側 upsert は device_id ごとに
+      // 最高スコアだけを保持し、同時に score_history へ1行追加する。
+      // （以前は「全体100位以内に入る時だけ送信」していたが、それだと
+      //  score_history が記録されず週間ランキングからスコアが欠落していた）
       if (score > 0 && user) {
-        (async () => {
-          try {
-            const res = await fetch(`${API_BASE}/api/rankings`);
-            if (res.ok) {
-              const rankings: { rank: number; user_name: string; score: number }[] = await res.json();
-              const qualifies =
-                rankings.length < 100 ||
-                score > rankings[rankings.length - 1].score;
-              if (qualifies) {
-                postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-              }
-            } else {
-              postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-            }
-          } catch {
-            postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
-          }
-        })();
+        postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
       }
 
       if (!cancelled) setReady(true);
