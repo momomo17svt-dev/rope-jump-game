@@ -133,8 +133,8 @@
 - [x] タイトル画面下部にバナー広告を表示（`ad_removed` が false の場合のみ）
 - [x] リザルト画面でインタースティシャル広告を表示（ゲームオーバー時）
 - [x] Expo Go 互換対応（`lib/adsafe.ts` で try/catch ラップ）
-- [ ] AdMob アカウントでアプリ登録・本番 App ID を `app.json` に設定
-- [ ] バナー・インタースティシャルの本番広告ユニット ID を `frontend/.env` に設定
+- [x] AdMob でアプリ登録・本番 App ID を `app.json` に設定（`ca-app-pub-8414918706609681~5644908641`）
+- [x] 本番広告ユニット ID を設定（`lib/adsConfig.ts` に直書き＝CIでenvが空になる事故を回避。env優先は維持）
 
 ### 6-2. 課金（RevenueCat × App Store IAP）
 - [x] `react-native-purchases` を導入
@@ -142,17 +142,19 @@
 - [x] `context/AdContext.tsx` で `adRemoved` 状態をアプリ全体に共有
 - [x] 設定画面に「広告を削除する」ボタン・「購入を復元」ボタンを追加
 - [x] Expo Go 互換対応（`lib/purchasessafe.ts` で try/catch ラップ）
-- [ ] RevenueCat プロジェクト作成・iOS Public API キーを `frontend/.env` に設定
-- [ ] App Store Connect で非消耗型課金商品（`remove_ads`）を作成
-- [ ] RevenueCat ダッシュボードで App Store と連携・Offering を設定
+- [x] RevenueCat プロジェクト作成・iOS Public キーを設定（`lib/purchasesConfig.ts`。env優先は維持）
+- [x] App Store Connect で非消耗型課金商品（`remove_ads`）を作成・提出準備完了
+- [x] RevenueCat で App Store 連携（In-App Purchase Key）・Entitlement・Offering(`default`/Current) 設定
+- [x] **Sandbox で購入・復元・起動時自動同期を実機確認OK（2026-05-31）**
+- 手順記録 → [docs/REVENUECAT_SETUP.md](./docs/REVENUECAT_SETUP.md)
 
 ### 6-3. ストア申請
-- [ ] Apple Developer Program 登録（年 $99）
+- [x] Apple Developer Program 登録（年 $99）
 - [x] Codemagic + EAS Build (`--local`) で本番 IPA をビルド・TestFlight へ配信
-- [~] TestFlight で実機テスト（起動・BGM/SE・UI は確認済み。広告/課金は本番キー設定後に確認）
-- [ ] App Store Connect でアプリ情報・スクリーンショット・プライバシーポリシーを整備
-- [ ] App Store 審査申請
-- [ ] ピクセルアートへのグラフィック差し替え（申請前推奨）
+- [x] TestFlight で実機テスト（起動・BGM/SE・UI・広告・課金すべて確認済み）
+- [ ] App Store Connect でアプリ情報・スクリーンショット・プライバシー（栄養表示）を整備
+- [ ] App Store 審査申請（初回IAP `remove_ads` をアプリバージョンに紐付けて同時提出）
+- [ ] ピクセルアートへのグラフィック差し替え（任意・申請前推奨）
 
 ---
 
@@ -190,7 +192,14 @@
 - [x] 広告削除フラグの自動同期：起動時に RevenueCat の entitlement から `ad_removed` を復元
       （再インストール／リセットでも購入が自動復活。configure は AdContext に集約）
 - [x] `supportsTablet: false`（iPad 対応オフで審査を簡素化）
-- [ ] AdMob 本番 App ID / 広告ユニット ID を設定（コンソール作業＋Codemagic env）
-- [ ] ATT/UMP の同意フロー詳細・プライバシー栄養表示の申告
-- [ ] RevenueCat 本番キー・IAP商品 `remove_ads`・Offering 設定（コンソール作業）
-- [ ] ランキングへのアバター画像表示（圧縮画像をテーブル列に格納する方針・実装は未着手）
+- [x] AdMob 本番 App ID / 広告ユニット ID を設定（`app.json` / `lib/adsConfig.ts`）
+- [x] RevenueCat 本番キー・IAP商品 `remove_ads`・Offering 設定（Sandbox購入確認済み）
+- [x] ランキングへのアバター画像表示（立ち絵を64x64 JPEG→base64で `global_rankings.avatar` に格納）
+- [ ] ATT/UMP の同意フロー詳細・プライバシー栄養表示の申告（申請前）
+
+### 7-6. App Store 申請物（次フェーズ・未着手）
+- [ ] スクリーンショット（6.7インチ必須）
+- [ ] 概要/説明・プロモテキスト・キーワード・サポートURL
+- [ ] アプリのプライバシー（IDFA/広告のデータ収集を申告）
+- [ ] 年齢制限指定
+- [ ] ビルド紐付け＋初回IAP同梱 → App Review 提出
