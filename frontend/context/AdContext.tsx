@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Platform } from 'react-native';
 import { initDB, getAdRemoved, setAdRemoved as dbSetAdRemoved } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
+import { REVENUECAT_IOS_KEY } from '@/lib/purchasesConfig';
 
 type AdContextType = {
   adRemoved: boolean;
@@ -14,7 +15,7 @@ const AdContext = createContext<AdContextType>({ adRemoved: false, markAdRemoved
 // configure 済みでない / SDK 不在 / 通信失敗時は null（＝判定不能なのでローカル値を維持）。
 async function checkPurchasedFromRevenueCat(): Promise<boolean | null> {
   if (Platform.OS !== 'ios' || !Purchases) return null;
-  const key = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
+  const key = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || REVENUECAT_IOS_KEY;
   // iOS 公開キーは "appl_" で始まる。不正値で configure するとネイティブ例外で
   // 起動クラッシュするため、形式が正しい場合のみ初期化する。
   if (!key.startsWith('appl_')) return null;
