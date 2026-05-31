@@ -5,10 +5,11 @@ import { getBestScore, saveScore, getLocalUser } from '@/db/database';
 import { useInterstitialAd, TestIds } from '@/lib/adsafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+import { ADMOB_IOS_INTERSTITIAL_ID } from '@/lib/adsConfig';
 
 const INTERSTITIAL_ID = __DEV__
   ? TestIds.INTERSTITIAL
-  : (process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID ?? '');
+  : (process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID || ADMOB_IOS_INTERSTITIAL_ID);
 
 async function postScoreToServer(
   deviceId: string,
