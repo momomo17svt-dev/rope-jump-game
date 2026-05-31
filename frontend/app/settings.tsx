@@ -9,7 +9,8 @@ import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
-import { makeAvatarThumb } from '@/lib/avatar';
+import { makeAvatarThumb, cropCenterSquare } from '@/lib/avatar';
+import removeBackground from '@/lib/bgremoversafe';
 import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
 
 const PRIVACY_URL = 'https://rope-jump-game.netlify.app/privacy';
@@ -34,6 +35,26 @@ export default function SettingsScreen() {
   const [permissionMsg, setPermissionMsg] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  // 背景削除の進行中フラグ（どちらの絵を処理中か）
+  const [removingBg, setRemovingBg] = useState<'stand' | 'jump' | null>(null);
+  // 設定画面はメニュー一覧（'menu'）と各詳細を同一画面内で切り替える。
+  // 横画面固定アプリのため Modal は使わず条件レンダリングで実装している。
+  const [page, setPage] = useState<'menu' | 'profile' | 'character' | 'purchase' | 'about'>('menu');
+
+  const openSection = (key: 'profile' | 'character' | 'purchase' | 'about') => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setErrorMsg('');
+    setSuccessMsg('');
+    setPermissionMsg('');
+    setPage(key);
+  };
+
+  const backToMenu = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setErrorMsg('');
+    setSuccessMsg('');
+    setPage('menu');
+  };
 
   useEffect(() => {
     (async () => {
@@ -54,16 +75,18 @@ export default function SettingsScreen() {
       return;
     }
 
+    // allowsEditing は使わない。iPhone では縦専用の UIImagePickerController クロップ画面が
+    // 開いて横画面が一瞬縦に回ってしまうため。横対応の PHPicker で選び、正方形クロップは
+    // 選択後に cropCenterSquare（expo-image-manipulator）でアプリ側から行う。
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.8,
     });
 
     if (result.canceled) return;
 
-    const srcUri = result.assets[0].uri;
+    const asset = result.assets[0];
+    const srcUri = await cropCenterSquare(asset.uri, asset.width, asset.height);
     const dir = FileSystem.documentDirectory + 'avatars/';
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
 
@@ -82,6 +105,36 @@ export default function SettingsScreen() {
   const resetAvatar = (type: 'stand' | 'jump') => {
     if (type === 'stand') setStandUri(null);
     else setJumpUri(null);
+  };
+
+  // 選択中の画像から背景を削除する（オンデバイス処理）。
+  // 結果は透過PNGとして avatars/ に保存し直し、元ファイルは削除する。
+  const removeBg = async (type: 'stand' | 'jump') => {
+    const uri = type === 'stand' ? standUri : jumpUri;
+    if (!uri) return;
+    // Expo Go ではネイティブモジュールが無いため null。製品版でのみ動作する。
+    if (!removeBackground) {
+      Alert.alert('利用できません', 'この機能は製品版アプリ（実機）でのみ利用できます。');
+      return;
+    }
+    setRemovingBg(type);
+    try {
+      const resultUri = await removeBackground(uri);
+      const dir = FileSystem.documentDirectory + 'avatars/';
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      const dest = dir + `${type}_nobg_${Date.now()}.png`;
+      await FileSystem.copyAsync({ from: resultUri, to: dest });
+      // 直前のファイルが自前ディレクトリのものなら削除して溜め込まない
+      if (uri.startsWith(dir)) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      }
+      if (type === 'stand') setStandUri(dest);
+      else setJumpUri(dest);
+    } catch {
+      Alert.alert('エラー', '背景の削除に失敗しました。別の画像でお試しください。');
+    } finally {
+      setRemovingBg(null);
+    }
   };
 
   const handlePurchaseRemoveAds = async () => {
@@ -177,200 +230,284 @@ export default function SettingsScreen() {
       }
 
       setSuccessMsg('保存しました');
-      setTimeout(() => router.back(), 800);
+      setTimeout(() => {
+        setSuccessMsg('');
+        backToMenu();
+      }, 800);
     } finally {
       setSaving(false);
     }
   };
 
+  const TITLES: Record<typeof page, string> = {
+    menu: '設定',
+    profile: 'プロフィール',
+    character: 'キャラクター',
+    purchase: '広告削除・課金',
+    about: 'アプリについて',
+  };
+
+  const saveButton = (
+    <TouchableOpacity
+      style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
+      onPress={saveAll}
+      disabled={saving || successMsg !== ''}
+    >
+      <Text style={styles.saveButtonText}>
+        {successMsg !== '' ? successMsg : saving ? '保存中...' : '保存する'}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => (page === 'menu' ? router.back() : backToMenu())}
+          style={styles.backButton}
+        >
           <Text style={styles.backText}>{'< 戻る'}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>設定</Text>
+        <Text style={styles.title}>{TITLES[page]}</Text>
       </View>
 
-      {/* ユーザー名 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>ユーザー名</Text>
-        <TextInput
-          style={styles.input}
-          value={userName}
-          onChangeText={(v) => { setUserName(v); setErrorMsg(''); }}
-          placeholder="1〜12文字"
-          placeholderTextColor="#888"
-          maxLength={12}
-        />
-        {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
-      </View>
+      {/* メニュー一覧（項目のみ表示） */}
+      {page === 'menu' && (
+        <View>
+          <TouchableOpacity style={styles.menuCard} onPress={() => openSection('profile')}>
+            <View style={styles.menuCardLeft}>
+              <Text style={styles.menuCardLabel}>プロフィール</Text>
+              <Text style={styles.menuCardSub}>{userName || 'ユーザー名'}</Text>
+            </View>
+            <Text style={styles.menuChevron}>›</Text>
+          </TouchableOpacity>
 
-      {/* 立ちアバター */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>キャラクター（立ち）</Text>
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarBox}>
-            {standUri ? (
-              <Image source={{ uri: standUri }} style={styles.avatarPreview} />
-            ) : (
-              <Image source={require('../assets/figure_stand_front.png')} style={styles.avatarPreview} />
-            )}
-          </View>
-          <View style={styles.avatarButtons}>
-            <TouchableOpacity style={styles.pickButton} onPress={() => pickImage('stand')}>
-              <Text style={styles.pickButtonText}>変更</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.resetButton} onPress={() => resetAvatar('stand')}>
-              <Text style={styles.resetButtonText}>デフォルト</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.menuCard} onPress={() => openSection('character')}>
+            <View style={styles.menuCardLeft}>
+              <Text style={styles.menuCardLabel}>キャラクター</Text>
+              <Text style={styles.menuCardSub}>立ち絵・ジャンプ絵の変更</Text>
+            </View>
+            <Text style={styles.menuChevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuCard} onPress={() => openSection('purchase')}>
+            <View style={styles.menuCardLeft}>
+              <Text style={styles.menuCardLabel}>広告削除・課金</Text>
+              <Text style={styles.menuCardSub}>{adRemoved ? '広告削除済み' : '広告を削除する'}</Text>
+            </View>
+            <Text style={styles.menuChevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuCard} onPress={() => openSection('about')}>
+            <View style={styles.menuCardLeft}>
+              <Text style={styles.menuCardLabel}>アプリについて</Text>
+              <Text style={styles.menuCardSub}>v{APP_VERSION}</Text>
+            </View>
+            <Text style={styles.menuChevron}>›</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
-      {/* ジャンプアバター */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>キャラクター（ジャンプ）</Text>
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarBox}>
-            {jumpUri ? (
-              <Image source={{ uri: jumpUri }} style={styles.avatarPreview} />
-            ) : (
-              <Image source={require('../assets/figure_jump.png')} style={styles.avatarPreview} />
-            )}
+      {/* プロフィール（ユーザー名） */}
+      {page === 'profile' && (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ユーザー名</Text>
+            <TextInput
+              style={styles.input}
+              value={userName}
+              onChangeText={(v) => { setUserName(v); setErrorMsg(''); }}
+              placeholder="1〜12文字"
+              placeholderTextColor="#888"
+              maxLength={12}
+            />
+            {errorMsg !== '' && <Text style={styles.errorText}>{errorMsg}</Text>}
           </View>
-          <View style={styles.avatarButtons}>
-            <TouchableOpacity style={styles.pickButton} onPress={() => pickImage('jump')}>
-              <Text style={styles.pickButtonText}>変更</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.resetButton} onPress={() => resetAvatar('jump')}>
-              <Text style={styles.resetButtonText}>デフォルト</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        {permissionMsg !== '' && <Text style={styles.errorText}>{permissionMsg}</Text>}
-      </View>
+          {saveButton}
+        </>
+      )}
 
-      {/* 背景除去ヒント */}
-      <View style={styles.hintBox}>
-        <TouchableOpacity
-          style={styles.hintHeader}
-          onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setShowHint(v => !v);
-          }}
-        >
-          <Text style={styles.hintHeaderText}>💡 背景を消すには？</Text>
-          <Text style={styles.hintChevron}>{showHint ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-        {showHint && (
-          <View style={styles.hintBody}>
-            <Text style={styles.hintNote}>iOS 16以降の機能を使うと、アプリ外で背景を除去できます。</Text>
-            <View style={styles.hintStep}>
-              <Text style={styles.hintNum}>1</Text>
-              <Text style={styles.hintText}>写真アプリで使いたい写真を開く</Text>
-            </View>
-            <View style={styles.hintStep}>
-              <Text style={styles.hintNum}>2</Text>
-              <Text style={styles.hintText}>人物部分を長押し →「被写体をコピー」を選択</Text>
-            </View>
-            <View style={styles.hintStep}>
-              <Text style={styles.hintNum}>3</Text>
-              <Text style={styles.hintText}>メモアプリを開いて長押し → 貼り付け</Text>
-            </View>
-            <View style={styles.hintStep}>
-              <Text style={styles.hintNum}>4</Text>
-              <Text style={styles.hintText}>貼り付けた画像を長押し →「写真に保存」</Text>
-            </View>
-            <View style={styles.hintStep}>
-              <Text style={styles.hintNum}>5</Text>
-              <Text style={styles.hintText}>ゲームに戻って「変更」から保存した画像を選択</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* 広告削除 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>課金</Text>
-        {adRemoved ? (
-          <View style={styles.adRemovedBadge}>
-            <Text style={styles.adRemovedText}>広告削除済み</Text>
-          </View>
-        ) : (
-          <View style={styles.purchaseBox}>
-            <TouchableOpacity
-              style={[styles.purchaseButton, purchasing && styles.saveButtonDisabled]}
-              onPress={handlePurchaseRemoveAds}
-              disabled={purchasing}
-            >
-              <Text style={styles.purchaseButtonText}>
-                {purchasing ? '処理中...' : '広告を削除する'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.restoreButton} onPress={handleRestorePurchases} disabled={purchasing}>
-              <Text style={styles.restoreButtonText}>購入を復元</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {/* アプリ情報 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>アプリについて</Text>
-
-        <View style={styles.appHeader}>
-          <Image source={APP_ICON} style={styles.appIcon} resizeMode="contain" />
-          <Text style={styles.appName}>大縄跳びサバイバル</Text>
-          <Text style={styles.appVersionSmall}>v{APP_VERSION}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(REVIEW_URL)}>
-          <Text style={styles.linkLabel}>アプリを評価する</Text>
-          <Text style={styles.linkChevron}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(PRIVACY_URL)}>
-          <Text style={styles.linkLabel}>プライバシーポリシー</Text>
-          <Text style={styles.linkChevron}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkRow} onPress={() => openURL(TERMS_URL)}>
-          <Text style={styles.linkLabel}>利用規約</Text>
-          <Text style={styles.linkChevron}>›</Text>
-        </TouchableOpacity>
-
-        {/* クレジット / 謝辞（内容は lib/credits.ts で編集） */}
-        <View style={styles.creditsBox}>
-          <Text style={styles.creditsHeading}>クレジット / 謝辞</Text>
-          <Text style={styles.creditsIntro}>{CREDITS_INTRO}</Text>
-          {CREDITS.map((c, i) => (
-            <View key={i} style={styles.creditEntry}>
-              <Text style={styles.creditRole}>{c.role}</Text>
-              {c.url ? (
-                <TouchableOpacity onPress={() => openURL(c.url!)}>
-                  <Text style={styles.creditNameLink}>{c.name} ↗</Text>
+      {/* キャラクター（立ち・ジャンプ・背景除去ヒント） */}
+      {page === 'character' && (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>キャラクター（立ち）</Text>
+            <View style={styles.avatarRow}>
+              <View style={styles.avatarBox}>
+                {standUri ? (
+                  <Image source={{ uri: standUri }} style={styles.avatarPreview} />
+                ) : (
+                  <Image source={require('../assets/figure_stand_front.png')} style={styles.avatarPreview} />
+                )}
+              </View>
+              <View style={styles.avatarButtons}>
+                <TouchableOpacity style={styles.pickButton} onPress={() => pickImage('stand')}>
+                  <Text style={styles.pickButtonText}>変更</Text>
                 </TouchableOpacity>
-              ) : (
-                <Text style={styles.creditName}>{c.name}</Text>
-              )}
-              {c.works && c.works.length > 0 && (
-                <Text style={styles.creditWorks}>{c.works.join(' / ')}</Text>
-              )}
+                {standUri && (
+                  <TouchableOpacity
+                    style={[styles.bgRemoveButton, removingBg === 'stand' && styles.saveButtonDisabled]}
+                    onPress={() => removeBg('stand')}
+                    disabled={removingBg !== null}
+                  >
+                    <Text style={styles.bgRemoveButtonText}>
+                      {removingBg === 'stand' ? '処理中...' : '背景を削除'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.resetButton} onPress={() => resetAvatar('stand')}>
+                  <Text style={styles.resetButtonText}>デフォルト</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          ))}
-        </View>
-      </View>
+          </View>
 
-      {/* 保存 */}
-      <TouchableOpacity
-        style={[styles.saveButton, (saving || successMsg !== '') && styles.saveButtonDisabled]}
-        onPress={saveAll}
-        disabled={saving || successMsg !== ''}
-      >
-        <Text style={styles.saveButtonText}>
-          {successMsg !== '' ? successMsg : saving ? '保存中...' : '保存する'}
-        </Text>
-      </TouchableOpacity>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>キャラクター（ジャンプ）</Text>
+            <View style={styles.avatarRow}>
+              <View style={styles.avatarBox}>
+                {jumpUri ? (
+                  <Image source={{ uri: jumpUri }} style={styles.avatarPreview} />
+                ) : (
+                  <Image source={require('../assets/figure_jump.png')} style={styles.avatarPreview} />
+                )}
+              </View>
+              <View style={styles.avatarButtons}>
+                <TouchableOpacity style={styles.pickButton} onPress={() => pickImage('jump')}>
+                  <Text style={styles.pickButtonText}>変更</Text>
+                </TouchableOpacity>
+                {jumpUri && (
+                  <TouchableOpacity
+                    style={[styles.bgRemoveButton, removingBg === 'jump' && styles.saveButtonDisabled]}
+                    onPress={() => removeBg('jump')}
+                    disabled={removingBg !== null}
+                  >
+                    <Text style={styles.bgRemoveButtonText}>
+                      {removingBg === 'jump' ? '処理中...' : '背景を削除'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.resetButton} onPress={() => resetAvatar('jump')}>
+                  <Text style={styles.resetButtonText}>デフォルト</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {permissionMsg !== '' && <Text style={styles.errorText}>{permissionMsg}</Text>}
+          </View>
+
+          {/* 背景除去ヒント */}
+          <View style={styles.hintBox}>
+            <TouchableOpacity
+              style={styles.hintHeader}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setShowHint(v => !v);
+              }}
+            >
+              <Text style={styles.hintHeaderText}>💡 うまく消えないときは（手動）</Text>
+              <Text style={styles.hintChevron}>{showHint ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {showHint && (
+              <View style={styles.hintBody}>
+                <Text style={styles.hintNote}>「背景を削除」でうまくいかない場合は、iOS 16以降の機能でアプリ外でも背景を除去できます。</Text>
+                <View style={styles.hintStep}>
+                  <Text style={styles.hintNum}>1</Text>
+                  <Text style={styles.hintText}>写真アプリで使いたい写真を開く</Text>
+                </View>
+                <View style={styles.hintStep}>
+                  <Text style={styles.hintNum}>2</Text>
+                  <Text style={styles.hintText}>人物部分を長押し →「被写体をコピー」を選択</Text>
+                </View>
+                <View style={styles.hintStep}>
+                  <Text style={styles.hintNum}>3</Text>
+                  <Text style={styles.hintText}>メモアプリを開いて長押し → 貼り付け</Text>
+                </View>
+                <View style={styles.hintStep}>
+                  <Text style={styles.hintNum}>4</Text>
+                  <Text style={styles.hintText}>貼り付けた画像を長押し →「写真に保存」</Text>
+                </View>
+                <View style={styles.hintStep}>
+                  <Text style={styles.hintNum}>5</Text>
+                  <Text style={styles.hintText}>ゲームに戻って「変更」から保存した画像を選択</Text>
+                </View>
+              </View>
+            )}
+          </View>
+          {saveButton}
+        </>
+      )}
+
+      {/* 広告削除・課金 */}
+      {page === 'purchase' && (
+        <View style={styles.section}>
+          {adRemoved ? (
+            <View style={styles.adRemovedBadge}>
+              <Text style={styles.adRemovedText}>広告削除済み</Text>
+            </View>
+          ) : (
+            <View style={styles.purchaseBox}>
+              <TouchableOpacity
+                style={[styles.purchaseButton, purchasing && styles.saveButtonDisabled]}
+                onPress={handlePurchaseRemoveAds}
+                disabled={purchasing}
+              >
+                <Text style={styles.purchaseButtonText}>
+                  {purchasing ? '処理中...' : '広告を削除する'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.restoreButton} onPress={handleRestorePurchases} disabled={purchasing}>
+                <Text style={styles.restoreButtonText}>購入を復元</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* アプリについて */}
+      {page === 'about' && (
+        <View style={styles.section}>
+          <View style={styles.appHeader}>
+            <Image source={APP_ICON} style={styles.appIcon} resizeMode="contain" />
+            <Text style={styles.appName}>大縄跳びサバイバル</Text>
+            <Text style={styles.appVersionSmall}>v{APP_VERSION}</Text>
+          </View>
+
+          <TouchableOpacity style={styles.linkRow} onPress={() => openURL(REVIEW_URL)}>
+            <Text style={styles.linkLabel}>アプリを評価する</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkRow} onPress={() => openURL(PRIVACY_URL)}>
+            <Text style={styles.linkLabel}>プライバシーポリシー</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkRow} onPress={() => openURL(TERMS_URL)}>
+            <Text style={styles.linkLabel}>利用規約</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+
+          {/* クレジット / 謝辞（内容は lib/credits.ts で編集） */}
+          <View style={styles.creditsBox}>
+            <Text style={styles.creditsHeading}>クレジット / 謝辞</Text>
+            <Text style={styles.creditsIntro}>{CREDITS_INTRO}</Text>
+            {CREDITS.map((c, i) => (
+              <View key={i} style={styles.creditEntry}>
+                <Text style={styles.creditRole}>{c.role}</Text>
+                {c.url ? (
+                  <TouchableOpacity onPress={() => openURL(c.url!)}>
+                    <Text style={styles.creditNameLink}>{c.name} ↗</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.creditName}>{c.name}</Text>
+                )}
+                {c.works && c.works.length > 0 && (
+                  <Text style={styles.creditWorks}>{c.works.join(' / ')}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </ScrollView>
     </SafeAreaView>
   );
@@ -404,6 +541,36 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 28,
+  },
+  menuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2a2a4e',
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#34345a',
+  },
+  menuCardLeft: {
+    flex: 1,
+  },
+  menuCardLabel: {
+    color: '#e0e0ff',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  menuCardSub: {
+    color: '#8888aa',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  menuChevron: {
+    color: '#666688',
+    fontSize: 24,
+    marginLeft: 12,
   },
   sectionTitle: {
     color: '#aaaacc',
@@ -457,6 +624,17 @@ const styles = StyleSheet.create({
   pickButtonText: {
     color: '#fff',
     fontSize: 15,
+    fontWeight: 'bold',
+  },
+  bgRemoveButton: {
+    backgroundColor: '#3aa37a',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  bgRemoveButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
   },
   resetButton: {
