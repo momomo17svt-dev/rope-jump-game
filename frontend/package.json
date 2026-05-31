@@ -24,6 +24,7 @@
     "expo-tracking-transparency": "~6.0.8",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-background-remover": "^0.3.2",
     "react-native-google-mobile-ads": "^16.3.3",
     "react-native-purchases": "^10.2.0",
     "react-native-safe-area-context": "~5.6.0",

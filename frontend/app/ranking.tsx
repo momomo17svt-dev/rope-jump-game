@@ -70,7 +70,7 @@ export default function RankingScreen() {
         </Text>
         <Image
           style={styles.avatar}
-          source={item.avatar ? { uri: `data:image/jpeg;base64,${item.avatar}` } : DEFAULT_AVATAR}
+          source={item.avatar ? { uri: `data:image/png;base64,${item.avatar}` } : DEFAULT_AVATAR}
         />
         <Text style={[styles.cell, styles.nameCell, isMe && styles.myText]} numberOfLines={1}>
           {item.user_name}
