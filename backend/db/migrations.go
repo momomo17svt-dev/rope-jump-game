@@ -54,8 +54,13 @@ const addLastPlayedAtSQL = `
 ALTER TABLE global_rankings ADD COLUMN IF NOT EXISTS last_played_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 `
 
+// avatar カラム（ランキング表示用の立ち絵サムネ。64x64 JPEG の base64 文字列）。NULL はデフォルト絵を意味する
+const addAvatarSQL = `
+ALTER TABLE global_rankings ADD COLUMN IF NOT EXISTS avatar TEXT;
+`
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL} {
+	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL, addAvatarSQL} {
 		if _, err := pool.Exec(ctx, sql); err != nil {
 			return err
 		}

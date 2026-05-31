@@ -7,18 +7,21 @@ import (
 )
 
 type Ranking struct {
-	Rank     int    `json:"rank"`
-	UserName string `json:"user_name"`
-	Score    int    `json:"score"`
+	Rank     int     `json:"rank"`
+	UserName string  `json:"user_name"`
+	Score    int     `json:"score"`
+	Avatar   *string `json:"avatar,omitempty"`
 }
 
-// スコア送信（プレイ時）: last_played_at を常に更新
+// スコア送信（プレイ時）: last_played_at を常に更新。avatar はクライアントが常に現状態
+// （カスタム=base64 / デフォルト=NULL）を送るため、そのまま上書きする。
 const upsertSQL = `
-INSERT INTO global_rankings (device_id, user_name, score, created_at, last_played_at)
-VALUES ($1, $2, $3, NOW(), NOW())
+INSERT INTO global_rankings (device_id, user_name, score, avatar, created_at, last_played_at)
+VALUES ($1, $2, $3, $4, NOW(), NOW())
 ON CONFLICT (device_id) DO UPDATE SET
   user_name      = EXCLUDED.user_name,
   score          = GREATEST(global_rankings.score, EXCLUDED.score),
+  avatar         = EXCLUDED.avatar,
   created_at     = CASE
                      WHEN EXCLUDED.score > global_rankings.score THEN NOW()
                      ELSE global_rankings.created_at
@@ -26,8 +29,8 @@ ON CONFLICT (device_id) DO UPDATE SET
   last_played_at = NOW()
 `
 
-func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int) error {
-	_, err := pool.Exec(ctx, upsertSQL, deviceID, userName, score)
+func InsertScore(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, score int, avatar *string) error {
+	_, err := pool.Exec(ctx, upsertSQL, deviceID, userName, score, avatar)
 	return err
 }
 
@@ -56,24 +59,25 @@ func DeleteProfile(ctx context.Context, pool *pgxpool.Pool, deviceID string) err
 	return tx.Commit(ctx)
 }
 
-// プロフィール更新（設定画面）: user_name のみ更新。last_played_at は変えない
+// プロフィール更新（設定画面）: user_name と avatar を更新。last_played_at は変えない。
+// avatar はクライアントが現状態（base64 / NULL）を送るためそのまま上書きする。
 const updateProfileSQL = `
-UPDATE global_rankings SET user_name = $2 WHERE device_id = $1
+UPDATE global_rankings SET user_name = $2, avatar = $3 WHERE device_id = $1
 `
 
-func UpdateProfile(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string) error {
-	_, err := pool.Exec(ctx, updateProfileSQL, deviceID, userName)
+func UpdateProfile(ctx context.Context, pool *pgxpool.Pool, deviceID, userName string, avatar *string) error {
+	_, err := pool.Exec(ctx, updateProfileSQL, deviceID, userName, avatar)
 	return err
 }
 
 const topRankingsSQL = `
-SELECT user_name, score
+SELECT user_name, score, avatar
 FROM global_rankings
 ORDER BY score DESC, created_at ASC
 LIMIT $1
 `
 
-// 今週プレイした人の「今週内ベスト」を表示。ユーザー名は global_rankings から最新を取得
+// 今週プレイした人の「今週内ベスト」を表示。ユーザー名・アバターは global_rankings から最新を取得
 const topWeeklyRankingsSQL = `
 WITH weekly_best AS (
     SELECT device_id, MAX(score) AS score
@@ -81,7 +85,7 @@ WITH weekly_best AS (
     WHERE played_at >= NOW() - INTERVAL '7 days'
     GROUP BY device_id
 )
-SELECT gr.user_name, wb.score
+SELECT gr.user_name, wb.score, gr.avatar
 FROM weekly_best wb
 JOIN global_rankings gr ON gr.device_id = wb.device_id
 ORDER BY wb.score DESC, gr.created_at ASC
@@ -99,7 +103,7 @@ func queryRankings(ctx context.Context, pool *pgxpool.Pool, sql string, limit in
 	rank := 1
 	for rows.Next() {
 		var r Ranking
-		if err := rows.Scan(&r.UserName, &r.Score); err != nil {
+		if err := rows.Scan(&r.UserName, &r.Score, &r.Avatar); err != nil {
 			return nil, err
 		}
 		r.Rank = rank

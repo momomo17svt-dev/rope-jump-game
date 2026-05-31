@@ -10,14 +10,19 @@ const INTERSTITIAL_ID = __DEV__
   ? TestIds.INTERSTITIAL
   : (process.env.EXPO_PUBLIC_ADMOB_IOS_INTERSTITIAL_ID ?? '');
 
-async function postScoreToServer(deviceId: string, userName: string, score: number): Promise<void> {
+async function postScoreToServer(
+  deviceId: string,
+  userName: string,
+  score: number,
+  avatar: string | null
+): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
     await fetch(`${API_BASE}/api/scores`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_id: deviceId, user_name: userName, score }),
+      body: JSON.stringify({ device_id: deviceId, user_name: userName, score, avatar }),
       signal: controller.signal,
     });
   } finally {
@@ -66,7 +71,7 @@ export default function ResultScreen() {
       // （以前は「全体100位以内に入る時だけ送信」していたが、それだと
       //  score_history が記録されず週間ランキングからスコアが欠落していた）
       if (score > 0 && user) {
-        postScoreToServer(user.device_id, user.user_name, score).catch(() => {});
+        postScoreToServer(user.device_id, user.user_name, score, user.avatar_thumb).catch(() => {});
       }
 
       if (!cancelled) setReady(true);

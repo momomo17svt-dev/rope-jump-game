@@ -41,6 +41,12 @@ export async function initDB(): Promise<void> {
   } catch {
     // カラムが既に存在する場合は無視
   }
+  try {
+    // ランキング表示用の立ち絵サムネ（64x64 JPEG の base64）。カスタム未設定なら null。
+    await database.execAsync('ALTER TABLE local_user ADD COLUMN avatar_thumb TEXT');
+  } catch {
+    // カラムが既に存在する場合は無視
+  }
 }
 
 export type LocalUser = {
@@ -49,12 +55,13 @@ export type LocalUser = {
   user_name: string;
   avatar_stand_uri: string | null;
   avatar_jump_uri: string | null;
+  avatar_thumb: string | null;
 };
 
 export async function getLocalUser(): Promise<LocalUser | null> {
   const database = await getDB();
   const result = await database.getFirstAsync<LocalUser>(
-    'SELECT id, device_id, user_name, avatar_stand_uri, avatar_jump_uri FROM local_user LIMIT 1'
+    'SELECT id, device_id, user_name, avatar_stand_uri, avatar_jump_uri, avatar_thumb FROM local_user LIMIT 1'
   );
   return result ?? null;
 }
@@ -73,12 +80,17 @@ export async function updateUserName(userName: string): Promise<void> {
   await database.runAsync('UPDATE local_user SET user_name = ?', userName);
 }
 
-export async function updateAvatarUris(standUri: string | null, jumpUri: string | null): Promise<void> {
+export async function updateAvatarUris(
+  standUri: string | null,
+  jumpUri: string | null,
+  standThumb: string | null
+): Promise<void> {
   const database = await getDB();
   await database.runAsync(
-    'UPDATE local_user SET avatar_stand_uri = ?, avatar_jump_uri = ?',
+    'UPDATE local_user SET avatar_stand_uri = ?, avatar_jump_uri = ?, avatar_thumb = ?',
     standUri,
-    jumpUri
+    jumpUri,
+    standThumb
   );
 }
 
