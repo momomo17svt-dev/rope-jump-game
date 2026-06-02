@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Platform } from 'react-native';
 import { initDB, getAdRemoved, setAdRemoved as dbSetAdRemoved } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
-import { REVENUECAT_IOS_KEY } from '@/lib/purchasesConfig';
+import { ensurePurchasesConfigured, hasActiveEntitlement } from '@/lib/purchases';
 
 type AdContextType = {
   adRemoved: boolean;
@@ -12,17 +11,12 @@ type AdContextType = {
 const AdContext = createContext<AdContextType>({ adRemoved: false, markAdRemoved: async () => {} });
 
 // RevenueCat の購入状態を確認し、有効な entitlement があれば true を返す。
-// configure 済みでない / SDK 不在 / 通信失敗時は null（＝判定不能なのでローカル値を維持）。
+// configure 不能（SDK不在/非iOS/キー不正）/ 通信失敗時は null（＝判定不能なのでローカル値を維持）。
 async function checkPurchasedFromRevenueCat(): Promise<boolean | null> {
-  if (Platform.OS !== 'ios' || !Purchases) return null;
-  const key = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || REVENUECAT_IOS_KEY;
-  // iOS 公開キーは "appl_" で始まる。不正値で configure するとネイティブ例外で
-  // 起動クラッシュするため、形式が正しい場合のみ初期化する。
-  if (!key.startsWith('appl_')) return null;
+  if (!ensurePurchasesConfigured()) return null;
   try {
-    Purchases.configure({ apiKey: key });
-    const info = await Purchases.getCustomerInfo();
-    return Object.keys(info.entitlements.active).length > 0;
+    const info = await Purchases!.getCustomerInfo();
+    return hasActiveEntitlement(info);
   } catch {
     return null;
   }
