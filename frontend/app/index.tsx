@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+import { isNameAllowed } from '@/lib/nameFilter';
 import { BannerSlot } from '@/components/BannerSlot';
+
+const TERMS_URL = 'https://rope-jump-game.netlify.app/terms';
 
 export default function TitleScreen() {
   const router = useRouter();
@@ -15,6 +18,8 @@ export default function TitleScreen() {
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // UGC（公開アバター/名前）アプリのため、初回登録時に利用規約への同意を必須化する
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/health`).catch(() => {});
@@ -35,6 +40,14 @@ export default function TitleScreen() {
     const trimmed = userName.trim();
     if (trimmed.length < 1 || trimmed.length > 12) {
       Alert.alert('エラー', 'プレイヤー名は1〜12文字で入力してください');
+      return;
+    }
+    if (!isNameAllowed(trimmed)) {
+      Alert.alert('エラー', '使用できない言葉が含まれています');
+      return;
+    }
+    if (!agreed) {
+      Alert.alert('確認', '利用規約への同意が必要です');
       return;
     }
     try {
@@ -75,7 +88,25 @@ export default function TitleScreen() {
             placeholderTextColor="#888"
             maxLength={12}
           />
-          <TouchableOpacity style={styles.primaryButton} onPress={handleSaveUser}>
+
+          {/* UGC対策：利用規約への同意（不適切な画像・名前の投稿禁止） */}
+          <TouchableOpacity style={styles.agreeRow} onPress={() => setAgreed((v) => !v)} activeOpacity={0.7}>
+            <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+              {agreed && <Text style={styles.checkboxMark}>✓</Text>}
+            </View>
+            <Text style={styles.agreeText}>
+              <Text style={styles.agreeLink} onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}>
+                利用規約
+              </Text>
+              に同意し、不適切な画像・名前を登録しません
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.primaryButton, !agreed && styles.primaryButtonDisabled]}
+            onPress={handleSaveUser}
+            disabled={!agreed}
+          >
             <Text style={styles.buttonText}>決定</Text>
           </TouchableOpacity>
         </View>
@@ -188,6 +219,44 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  primaryButtonDisabled: {
+    opacity: 0.4,
+  },
+  agreeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#7777aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: '#4a90d9',
+    borderColor: '#4a90d9',
+  },
+  checkboxMark: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  agreeText: {
+    flex: 1,
+    color: '#aaaacc',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  agreeLink: {
+    color: '#4a90d9',
+    textDecorationLine: 'underline',
   },
   secondaryRow: {
     flexDirection: 'row',
