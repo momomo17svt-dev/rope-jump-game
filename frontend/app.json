@@ -71,7 +71,8 @@
         {
           "userTrackingPermission": "お客様に合わせた広告を表示するために使用します。"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {},

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
 import { isNameAllowed } from '@/lib/nameFilter';
+import { getOrCreateDeviceId, clearDeviceId } from '@/lib/deviceId';
 import { BannerSlot } from '@/components/BannerSlot';
 
 const TERMS_URL = 'https://rope-jump-game.netlify.app/terms';
@@ -64,7 +64,8 @@ export default function TitleScreen() {
     } catch {
       // オフライン時はチェックをスキップして続行
     }
-    const deviceId = Crypto.randomUUID();
+    // Keychain に保存済みの device_id を復元（再インストールでも同一ID＝重複登録を防ぐ）
+    const deviceId = await getOrCreateDeviceId();
     await saveLocalUser(deviceId, trimmed);
     const score = await getBestScore();
     setBestScore(score);
@@ -163,6 +164,8 @@ export default function TitleScreen() {
                     }).catch(() => {});
                   }
                   await clearLocalData();
+                  // 次回登録で新しい ID を発番する（明示リセット＝別ユーザーとして開始）
+                  await clearDeviceId();
                   setBestScore(null);
                   setShowSetup(true);
                 }}
