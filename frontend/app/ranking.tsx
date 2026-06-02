@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { getLocalUser, getBlockedNames, addBlockedName } from '@/db/database';
+import { getLocalUser, getBlockedNames, addBlockedName, removeBlockedName } from '@/db/database';
 import { API_BASE } from '@/lib/api';
 
 type Period = 'all' | 'weekly';
@@ -88,10 +88,17 @@ export default function RankingScreen() {
     }
   };
 
-  // 非表示（ブロック）：ローカルでランキングから除外する
+  // 非表示（ブロック）：行は残したまま中身を伏せる（順位はずらさない）
   const handleBlock = async (entry: RankingEntry) => {
     await addBlockedName(entry.user_name);
     setBlockedNames((prev) => [...prev, entry.user_name]);
+    setSelectedEntry(null);
+  };
+
+  // 解除（復元）：伏せ表示を元に戻す
+  const handleUnblock = async (entry: RankingEntry) => {
+    await removeBlockedName(entry.user_name);
+    setBlockedNames((prev) => prev.filter((n) => n !== entry.user_name));
     setSelectedEntry(null);
   };
 
@@ -101,36 +108,38 @@ export default function RankingScreen() {
 
   const renderItem = ({ item }: { item: RankingEntry }) => {
     const isMe = myUserName !== null && item.user_name === myUserName;
+    const isBlocked = blockedNames.includes(item.user_name);
     const rankLabel =
       item.rank === 1 ? '1st' : item.rank === 2 ? '2nd' : item.rank === 3 ? '3rd' : String(item.rank);
     return (
       <TouchableOpacity
         style={[styles.row, isMe && styles.myRow]}
         activeOpacity={isMe ? 1 : 0.6}
-        // 自分以外のエントリーは長押し/タップで通報・非表示メニューを開く
+        // 自分以外をタップ → 通報/非表示メニュー。伏せた行をタップ → 解除メニュー。
         onPress={() => { if (!isMe) setSelectedEntry(item); }}
         disabled={isMe}
       >
         <Text style={[styles.cell, styles.rankCell, item.rank <= 3 && styles.topRankText]}>
           {rankLabel}
         </Text>
+        {/* ブロック/通報した相手はアバター・名前を伏せる（順位・スコアは残す） */}
         <Image
           style={styles.avatar}
-          source={item.avatar ? { uri: `data:image/png;base64,${item.avatar}` } : DEFAULT_AVATAR}
+          source={!isBlocked && item.avatar ? { uri: `data:image/png;base64,${item.avatar}` } : DEFAULT_AVATAR}
         />
-        <Text style={[styles.cell, styles.nameCell, isMe && styles.myText]} numberOfLines={1}>
-          {item.user_name}
+        <Text
+          style={[styles.cell, styles.nameCell, isMe && styles.myText, isBlocked && styles.blockedName]}
+          numberOfLines={1}
+        >
+          {isBlocked ? '非表示のユーザー' : item.user_name}
         </Text>
         <Text style={[styles.cell, styles.scoreCell, isMe && styles.myText]}>
           {item.score}
         </Text>
-        {!isMe && <Text style={styles.moreIcon}>⋯</Text>}
+        {!isMe && <Text style={styles.moreIcon}>{isBlocked ? '↺' : '⋯'}</Text>}
       </TouchableOpacity>
     );
   };
-
-  // ブロック/通報済みの名前はランキングから除外して表示
-  const visibleRankings = rankings.filter((r) => !blockedNames.includes(r.user_name));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -174,14 +183,14 @@ export default function RankingScreen() {
             <Text style={styles.retryButtonText}>再試行</Text>
           </TouchableOpacity>
         </View>
-      ) : visibleRankings.length === 0 ? (
+      ) : rankings.length === 0 ? (
         <View style={styles.centerContent}>
           <Text style={styles.emptyText}>まだランキングデータがありません</Text>
         </View>
       ) : (
         <FlatList
           style={styles.list}
-          data={visibleRankings}
+          data={rankings}
           keyExtractor={(item) => String(item.rank)}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
@@ -197,24 +206,39 @@ export default function RankingScreen() {
             onPress={() => { if (!reporting) setSelectedEntry(null); }}
           />
           <View style={styles.actionCard}>
-            <Text style={styles.actionTitle} numberOfLines={1}>{selectedEntry.user_name}</Text>
-            <Text style={styles.actionDesc}>不適切なアバター画像や名前ですか？</Text>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.reportButton, reporting && styles.actionDisabled]}
-              onPress={() => handleReport(selectedEntry)}
-              disabled={reporting}
-            >
-              <Text style={styles.reportButtonText}>{reporting ? '送信中...' : '通報する'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.blockButton]}
-              onPress={() => handleBlock(selectedEntry)}
-              disabled={reporting}
-            >
-              <Text style={styles.blockButtonText}>非表示にする（ブロック）</Text>
-            </TouchableOpacity>
+            {blockedNames.includes(selectedEntry.user_name) ? (
+              <>
+                {/* 伏せ表示中の相手 → 解除メニュー */}
+                <Text style={styles.actionTitle}>非表示中のユーザー</Text>
+                <Text style={styles.actionDesc}>このユーザーの表示を元に戻しますか？</Text>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.blockButton]}
+                  onPress={() => handleUnblock(selectedEntry)}
+                >
+                  <Text style={styles.blockButtonText}>表示を元に戻す（ブロック解除）</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {/* 通常の相手 → 通報/非表示メニュー */}
+                <Text style={styles.actionTitle} numberOfLines={1}>{selectedEntry.user_name}</Text>
+                <Text style={styles.actionDesc}>不適切なアバター画像や名前ですか？</Text>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.reportButton, reporting && styles.actionDisabled]}
+                  onPress={() => handleReport(selectedEntry)}
+                  disabled={reporting}
+                >
+                  <Text style={styles.reportButtonText}>{reporting ? '送信中...' : '通報する'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.blockButton]}
+                  onPress={() => handleBlock(selectedEntry)}
+                  disabled={reporting}
+                >
+                  <Text style={styles.blockButtonText}>非表示にする（ブロック）</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             <TouchableOpacity
               style={styles.actionCancel}
@@ -368,6 +392,10 @@ const styles = StyleSheet.create({
   nameCell: {
     flex: 1,
     paddingHorizontal: 8,
+  },
+  blockedName: {
+    color: '#777799',
+    fontStyle: 'italic',
   },
   scoreCell: {
     width: 88,
