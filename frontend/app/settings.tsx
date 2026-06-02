@@ -119,7 +119,10 @@ export default function SettingsScreen() {
     }
     setRemovingBg(type);
     try {
-      const resultUri = await removeBackground(uri);
+      // trim:false で元の正方形フレームを保つ（trueだと被写体に合わせて切り詰められ
+      // 縦横比が崩れ、正方形スロットで歪むため）。被写体が無い画像はライブラリが
+      // エラーを投げるので、その場合は元画像を維持する。
+      const resultUri = await removeBackground(uri, { trim: false });
       const dir = FileSystem.documentDirectory + 'avatars/';
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       const dest = dir + `${type}_nobg_${Date.now()}.png`;
@@ -130,8 +133,19 @@ export default function SettingsScreen() {
       }
       if (type === 'stand') setStandUri(dest);
       else setJumpUri(dest);
-    } catch {
-      Alert.alert('エラー', '背景の削除に失敗しました。別の画像でお試しください。');
+    } catch (e: any) {
+      // iOS 15.1〜16 は汎用被写体抽出に非対応。手動の方法へ案内する。
+      if (e?.message === 'REQUIRES_API_FALLBACK') {
+        Alert.alert(
+          '自動削除は非対応',
+          'このiOSバージョンでは自動の背景削除に対応していません。「うまく消えないときは（手動）」の手順をお試しください。'
+        );
+      } else {
+        Alert.alert(
+          '削除できませんでした',
+          '被写体を認識できませんでした。人物・動物・物などがはっきり写った画像でお試しください。'
+        );
+      }
     } finally {
       setRemovingBg(null);
     }
