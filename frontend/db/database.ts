@@ -163,3 +163,8 @@ export async function addBlockedName(name: string): Promise<void> {
   const database = await getDB();
   await database.runAsync('INSERT OR IGNORE INTO blocked_names (name) VALUES (?)', name);
 }
+
+export async function removeBlockedName(name: string): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('DELETE FROM blocked_names WHERE name = ?', name);
+}
