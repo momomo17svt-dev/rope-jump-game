@@ -10,7 +10,7 @@ import Purchases from '@/lib/purchasessafe';
 import { ensurePurchasesConfigured, hasActiveEntitlement } from '@/lib/purchases';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
-import { makeAvatarThumb, cropCenterSquare } from '@/lib/avatar';
+import { makeAvatarThumb, cropCenterSquare, resolveAvatarUri, toRelativeAvatarPath } from '@/lib/avatar';
 import { isNameAllowed } from '@/lib/nameFilter';
 import removeBackground from '@/lib/bgremoversafe';
 import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
@@ -66,8 +66,9 @@ export default function SettingsScreen() {
       const user = await getLocalUser();
       if (user) {
         setUserName(user.user_name);
-        setStandUri(user.avatar_stand_uri);
-        setJumpUri(user.avatar_jump_uri);
+        // 保存値（相対/旧絶対）を現在のコンテナの絶対URIに解決して表示する
+        setStandUri(resolveAvatarUri(user.avatar_stand_uri));
+        setJumpUri(resolveAvatarUri(user.avatar_jump_uri));
       }
     })();
   }, []);
@@ -269,7 +270,8 @@ export default function SettingsScreen() {
       const thumb = await makeAvatarThumb(standUri);
 
       await updateUserName(trimmed);
-      await updateAvatarUris(standUri, jumpUri, thumb);
+      // アップデートでコンテナUUIDが変わっても参照できるよう、相対パスで保存する
+      await updateAvatarUris(toRelativeAvatarPath(standUri), toRelativeAvatarPath(jumpUri), thumb);
 
       // ランキングのユーザー名とアバターを更新（last_played_at は変えない）
       if (user) {
