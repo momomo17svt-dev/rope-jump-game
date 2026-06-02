@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg';
 import { useGameSounds } from '../hooks/useGameSounds';
 import { getLocalUser } from '../db/database';
+import { resolveAvatarUri } from '../lib/avatar';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -179,8 +180,9 @@ export default function GameScreen() {
   useEffect(() => {
     getLocalUser().then((user) => {
       if (user) {
-        setAvatarStandUri(user.avatar_stand_uri);
-        setAvatarJumpUri(user.avatar_jump_uri);
+        // 保存値は相対/旧絶対のどちらもあり得るため、現在のコンテナの絶対URIに解決する
+        setAvatarStandUri(resolveAvatarUri(user.avatar_stand_uri));
+        setAvatarJumpUri(resolveAvatarUri(user.avatar_jump_uri));
       }
     });
   }, []);
