@@ -51,6 +51,9 @@ func main() {
 		log.Fatalf("migration failed: %v", err)
 	}
 
+	// 古い score_history を定期削除して DB 肥大化を防ぐ（起動時＋24時間ごと）。
+	go runScoreHistoryCleanup(pool)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("POST /api/scores", postScoreHandler(pool))
@@ -85,6 +88,29 @@ func main() {
 	defer cancelShutdown()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
+	}
+}
+
+// runScoreHistoryCleanup は score_history の保持期間超過分を起動時と24時間ごとに削除する。
+func runScoreHistoryCleanup(pool *pgxpool.Pool) {
+	const retentionDays = 30
+	cleanup := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		n, err := db.DeleteOldScoreHistory(ctx, pool, retentionDays)
+		if err != nil {
+			log.Printf("score_history cleanup error: %v", err)
+			return
+		}
+		if n > 0 {
+			log.Printf("score_history cleanup: deleted %d rows older than %d days", n, retentionDays)
+		}
+	}
+	cleanup()
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		cleanup()
 	}
 }
 

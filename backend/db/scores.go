@@ -42,6 +42,19 @@ func InsertScoreHistory(ctx context.Context, pool *pgxpool.Pool, deviceID string
 	return err
 }
 
+// DeleteOldScoreHistory は保持期間を過ぎた score_history を削除する。
+// 週間ランキングは直近7日しか参照しないため、古い履歴は不要。DB肥大化を防ぐ。
+func DeleteOldScoreHistory(ctx context.Context, pool *pgxpool.Pool, olderThanDays int) (int64, error) {
+	tag, err := pool.Exec(ctx,
+		`DELETE FROM score_history WHERE played_at < NOW() - make_interval(days => $1)`,
+		olderThanDays,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // データリセット: device_id に紐づくランキングデータをすべて削除
 func DeleteProfile(ctx context.Context, pool *pgxpool.Pool, deviceID string) error {
 	tx, err := pool.Begin(ctx)

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Crypto from 'expo-crypto';
 import { initDB, getLocalUser, saveLocalUser, getBestScore, clearLocalData } from '@/db/database';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
 import { isNameAllowed } from '@/lib/nameFilter';
+import { getOrCreateDeviceId, clearDeviceId } from '@/lib/deviceId';
 import { BannerSlot } from '@/components/BannerSlot';
 
 const TERMS_URL = 'https://rope-jump-game.netlify.app/terms';
@@ -50,9 +50,14 @@ export default function TitleScreen() {
       Alert.alert('確認', '利用規約への同意が必要です');
       return;
     }
+    // 先に device_id を確定する（再インストール時は Keychain から既存IDを復元）。
+    // check-username にこの device_id を渡し、自分の既存行を除外することで、
+    // 再インストール後も「自分の名前」を再利用できるようにする（空だと自分の行が
+    // 衝突扱いになり再利用できない）。
+    const deviceId = await getOrCreateDeviceId();
     try {
       const res = await fetch(
-        `${API_BASE}/api/check-username?name=${encodeURIComponent(trimmed)}&device_id=`
+        `${API_BASE}/api/check-username?name=${encodeURIComponent(trimmed)}&device_id=${encodeURIComponent(deviceId)}`
       );
       if (res.ok) {
         const { available } = await res.json();
@@ -64,7 +69,6 @@ export default function TitleScreen() {
     } catch {
       // オフライン時はチェックをスキップして続行
     }
-    const deviceId = Crypto.randomUUID();
     await saveLocalUser(deviceId, trimmed);
     const score = await getBestScore();
     setBestScore(score);
@@ -163,6 +167,8 @@ export default function TitleScreen() {
                     }).catch(() => {});
                   }
                   await clearLocalData();
+                  // 次回登録で新しい ID を発番する（明示リセット＝別ユーザーとして開始）
+                  await clearDeviceId();
                   setBestScore(null);
                   setShowSetup(true);
                 }}
