@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalUser, updateUserName, updateAvatarUris } from '@/db/database';
 import Purchases from '@/lib/purchasessafe';
+import { ensurePurchasesConfigured, hasActiveEntitlement } from '@/lib/purchases';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
 import { makeAvatarThumb, cropCenterSquare } from '@/lib/avatar';
@@ -35,6 +36,9 @@ export default function SettingsScreen() {
   const [permissionMsg, setPermissionMsg] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  // 広告削除パッケージとローカライズ価格（取得できたときだけ価格を表示）
+  const [adPackage, setAdPackage] = useState<any>(null);
+  const [priceLabel, setPriceLabel] = useState<string | null>(null);
   // 背景削除の進行中フラグ（どちらの絵を処理中か）
   const [removingBg, setRemovingBg] = useState<'stand' | 'jump' | null>(null);
   // 設定画面はメニュー一覧（'menu'）と各詳細を同一画面内で切り替える。
@@ -151,24 +155,52 @@ export default function SettingsScreen() {
     }
   };
 
+  // 広告削除の価格表示用に、購入前にオファリング（先頭パッケージ）を取得しておく。
+  // 取得できなければ価格は出さず、従来どおりのボタン表記にフォールバックする。
+  useEffect(() => {
+    if (adRemoved) return;
+    if (!ensurePurchasesConfigured()) return;
+    (async () => {
+      try {
+        const offerings = await Purchases!.getOfferings();
+        const pkg = offerings.current?.availablePackages[0] ?? null;
+        if (pkg) {
+          setAdPackage(pkg);
+          setPriceLabel(pkg.product?.priceString ?? null);
+        }
+      } catch {
+        // 価格取得失敗時は何もしない（購入時に再取得する）
+      }
+    })();
+  }, [adRemoved]);
+
   const handlePurchaseRemoveAds = async () => {
-    if (!Purchases) {
+    if (!ensurePurchasesConfigured()) {
       Alert.alert('エラー', '現在この環境では購入できません');
       return;
     }
     setPurchasing(true);
     try {
-      const offerings = await Purchases.getOfferings();
-      const pkg = offerings.current?.availablePackages[0];
+      // 価格表示用に取得済みのパッケージを優先利用。無ければここで取得する。
+      let pkg = adPackage;
+      if (!pkg) {
+        const offerings = await Purchases!.getOfferings();
+        pkg = offerings.current?.availablePackages[0] ?? null;
+      }
       if (!pkg) {
         Alert.alert('エラー', '購入情報を取得できませんでした');
         return;
       }
-      await Purchases.purchasePackage(pkg);
-      await markAdRemoved();
-      Alert.alert('完了', '広告が削除されました！');
+      const { customerInfo } = await Purchases!.purchasePackage(pkg);
+      // 購入完了後、entitlement が実際に有効化されたか検証してから記録する
+      if (hasActiveEntitlement(customerInfo)) {
+        await markAdRemoved();
+        Alert.alert('完了', '広告が削除されました！');
+      } else {
+        Alert.alert('エラー', '購入は完了しましたが反映に失敗しました。「購入を復元」をお試しください。');
+      }
     } catch (e: any) {
-      if (!e.userCancelled) {
+      if (!e?.userCancelled) {
         Alert.alert('エラー', '購入に失敗しました');
       }
     } finally {
@@ -177,14 +209,14 @@ export default function SettingsScreen() {
   };
 
   const handleRestorePurchases = async () => {
-    if (!Purchases) {
+    if (!ensurePurchasesConfigured()) {
       Alert.alert('エラー', '現在この環境では復元できません');
       return;
     }
     setPurchasing(true);
     try {
-      const info = await Purchases.restorePurchases();
-      if (Object.keys(info.entitlements.active).length > 0) {
+      const info = await Purchases!.restorePurchases();
+      if (hasActiveEntitlement(info)) {
         await markAdRemoved();
         Alert.alert('復元完了', '広告が削除されました！');
       } else {
@@ -467,9 +499,14 @@ export default function SettingsScreen() {
                 disabled={purchasing}
               >
                 <Text style={styles.purchaseButtonText}>
-                  {purchasing ? '処理中...' : '広告を削除する'}
+                  {purchasing
+                    ? '処理中...'
+                    : priceLabel
+                    ? `広告を削除する（${priceLabel}）`
+                    : '広告を削除する'}
                 </Text>
               </TouchableOpacity>
+              <Text style={styles.purchaseNote}>買い切り（一度購入すれば広告が表示されなくなります）</Text>
               <TouchableOpacity style={styles.restoreButton} onPress={handleRestorePurchases} disabled={purchasing}>
                 <Text style={styles.restoreButtonText}>購入を復元</Text>
               </TouchableOpacity>
@@ -741,6 +778,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  purchaseNote: {
+    color: '#8888aa',
+    fontSize: 12,
+    textAlign: 'center',
   },
   restoreButton: {
     paddingVertical: 8,
