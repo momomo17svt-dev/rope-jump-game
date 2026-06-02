@@ -59,8 +59,22 @@ const addAvatarSQL = `
 ALTER TABLE global_rankings ADD COLUMN IF NOT EXISTS avatar TEXT;
 `
 
+// UGC（公開アバター/名前）の通報を記録するテーブル。開発者が確認し、
+// 該当 device_id のデータを DELETE /api/profile で削除できるようにするための窓口。
+const createReportsSQL = `
+CREATE TABLE IF NOT EXISTS reports (
+    id                 BIGSERIAL PRIMARY KEY,
+    reporter_device_id TEXT,
+    reported_device_id TEXT,
+    reported_user_name TEXT NOT NULL,
+    reason             TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports (created_at DESC);
+`
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL, addAvatarSQL} {
+	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL, addAvatarSQL, createReportsSQL} {
 		if _, err := pool.Exec(ctx, sql); err != nil {
 			return err
 		}

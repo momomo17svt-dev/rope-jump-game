@@ -20,6 +20,7 @@ const (
 	maxDeviceIDLen   = 64
 	maxUserNameRunes = 12
 	maxScore         = 1_000_000
+	maxReasonLen     = 200
 	rankingLimit     = 100
 	// アバターは 64x64 JPEG の base64。通常数KBだが余裕を持って上限を設定する。
 	maxAvatarBytes = 64 * 1024
@@ -57,6 +58,7 @@ func main() {
 	mux.HandleFunc("GET /api/check-username", checkUsernameHandler(pool))
 	mux.HandleFunc("PATCH /api/profile", patchProfileHandler(pool))
 	mux.HandleFunc("DELETE /api/profile", deleteProfileHandler(pool))
+	mux.HandleFunc("POST /api/report", postReportHandler(pool))
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -190,6 +192,44 @@ func deleteProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := db.DeleteProfile(r.Context(), pool, deviceID); err != nil {
 			log.Printf("delete profile error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+type reportRequest struct {
+	ReporterDeviceID string `json:"reporter_device_id"`
+	ReportedUserName string `json:"reported_user_name"`
+	Reason           string `json:"reason"`
+}
+
+func postReportHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+
+		var req reportRequest
+		if err := dec.Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+		if n := utf8.RuneCountInString(req.ReportedUserName); n < 1 || n > maxUserNameRunes {
+			writeError(w, http.StatusBadRequest, "invalid reported_user_name")
+			return
+		}
+		if len(req.ReporterDeviceID) > maxDeviceIDLen {
+			writeError(w, http.StatusBadRequest, "invalid reporter_device_id")
+			return
+		}
+		if utf8.RuneCountInString(req.Reason) > maxReasonLen {
+			writeError(w, http.StatusBadRequest, "invalid reason")
+			return
+		}
+		if err := db.InsertReport(r.Context(), pool, req.ReporterDeviceID, req.ReportedUserName, req.Reason); err != nil {
+			log.Printf("insert report error: %v", err)
 			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}

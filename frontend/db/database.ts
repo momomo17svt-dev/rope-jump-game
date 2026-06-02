@@ -23,6 +23,10 @@ export async function initDB(): Promise<void> {
       score INTEGER NOT NULL,
       played_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS blocked_names (
+      name TEXT PRIMARY KEY
+    );
   `);
 
   // マイグレーション: アバターカラムを追加（既存インストール対応）
@@ -145,4 +149,17 @@ export async function clearLocalData(): Promise<void> {
     DELETE FROM local_scores;
     DELETE FROM local_user;
   `);
+}
+
+// ランキングで非表示にするプレイヤー名（ブロック/通報したユーザー）。
+// プレイヤー名はサーバ側で一意のため、名前をキーにブロックする。
+export async function getBlockedNames(): Promise<string[]> {
+  const database = await getDB();
+  const rows = await database.getAllAsync<{ name: string }>('SELECT name FROM blocked_names');
+  return rows.map((r) => r.name);
+}
+
+export async function addBlockedName(name: string): Promise<void> {
+  const database = await getDB();
+  await database.runAsync('INSERT OR IGNORE INTO blocked_names (name) VALUES (?)', name);
 }

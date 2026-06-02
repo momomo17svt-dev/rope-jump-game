@@ -10,6 +10,7 @@ import Purchases from '@/lib/purchasessafe';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
 import { makeAvatarThumb, cropCenterSquare } from '@/lib/avatar';
+import { isNameAllowed } from '@/lib/nameFilter';
 import removeBackground from '@/lib/bgremoversafe';
 import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
 
@@ -203,6 +204,10 @@ export default function SettingsScreen() {
     const trimmed = userName.trim();
     if (trimmed.length < 1 || trimmed.length > 12) {
       setErrorMsg('プレイヤー名は1〜12文字で入力してください');
+      return;
+    }
+    if (!isNameAllowed(trimmed)) {
+      setErrorMsg('使用できない言葉が含まれています');
       return;
     }
     setSaving(true);

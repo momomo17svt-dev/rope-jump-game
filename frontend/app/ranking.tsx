@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { getLocalUser } from '@/db/database';
+import { getLocalUser, getBlockedNames, addBlockedName } from '@/db/database';
 import { API_BASE } from '@/lib/api';
 
 type Period = 'all' | 'weekly';
@@ -30,6 +30,12 @@ export default function RankingScreen() {
   const [period, setPeriod] = useState<Period>('all');
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [myUserName, setMyUserName] = useState<string | null>(null);
+  const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+  const [blockedNames, setBlockedNames] = useState<string[]>([]);
+  // 通報/非表示の操作対象（選択中のエントリー）。横画面で Modal は使えないため
+  // 画面内オーバーレイ（条件レンダリング）でアクションシートを表示する。
+  const [selectedEntry, setSelectedEntry] = useState<RankingEntry | null>(null);
+  const [reporting, setReporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -42,10 +48,16 @@ export default function RankingScreen() {
       const url = p === 'weekly'
         ? `${API_BASE}/api/rankings?period=weekly`
         : `${API_BASE}/api/rankings`;
-      const [user, res] = await Promise.all([getLocalUser(), fetch(url, { signal: controller.signal })]);
+      const [user, blocked, res] = await Promise.all([
+        getLocalUser(),
+        getBlockedNames(),
+        fetch(url, { signal: controller.signal }),
+      ]);
       if (!res.ok) throw new Error('fetch failed');
       const data: RankingEntry[] = await res.json();
       setMyUserName(user?.user_name ?? null);
+      setMyDeviceId(user?.device_id ?? null);
+      setBlockedNames(blocked);
       setRankings(data);
     } catch {
       setError(true);
@@ -54,6 +66,34 @@ export default function RankingScreen() {
       setLoading(false);
     }
   }, []);
+
+  // 通報：サーバに記録し、以後ローカルでも非表示にする
+  const handleReport = async (entry: RankingEntry) => {
+    setReporting(true);
+    try {
+      await fetch(`${API_BASE}/api/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reporter_device_id: myDeviceId ?? '',
+          reported_user_name: entry.user_name,
+          reason: '不適切なアバター画像または名前',
+        }),
+      }).catch(() => {});
+      await addBlockedName(entry.user_name);
+      setBlockedNames((prev) => [...prev, entry.user_name]);
+    } finally {
+      setReporting(false);
+      setSelectedEntry(null);
+    }
+  };
+
+  // 非表示（ブロック）：ローカルでランキングから除外する
+  const handleBlock = async (entry: RankingEntry) => {
+    await addBlockedName(entry.user_name);
+    setBlockedNames((prev) => [...prev, entry.user_name]);
+    setSelectedEntry(null);
+  };
 
   useEffect(() => {
     fetchRankings(period);
@@ -64,7 +104,13 @@ export default function RankingScreen() {
     const rankLabel =
       item.rank === 1 ? '1st' : item.rank === 2 ? '2nd' : item.rank === 3 ? '3rd' : String(item.rank);
     return (
-      <View style={[styles.row, isMe && styles.myRow]}>
+      <TouchableOpacity
+        style={[styles.row, isMe && styles.myRow]}
+        activeOpacity={isMe ? 1 : 0.6}
+        // 自分以外のエントリーは長押し/タップで通報・非表示メニューを開く
+        onPress={() => { if (!isMe) setSelectedEntry(item); }}
+        disabled={isMe}
+      >
         <Text style={[styles.cell, styles.rankCell, item.rank <= 3 && styles.topRankText]}>
           {rankLabel}
         </Text>
@@ -78,9 +124,13 @@ export default function RankingScreen() {
         <Text style={[styles.cell, styles.scoreCell, isMe && styles.myText]}>
           {item.score}
         </Text>
-      </View>
+        {!isMe && <Text style={styles.moreIcon}>⋯</Text>}
+      </TouchableOpacity>
     );
   };
+
+  // ブロック/通報済みの名前はランキングから除外して表示
+  const visibleRankings = rankings.filter((r) => !blockedNames.includes(r.user_name));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -124,18 +174,57 @@ export default function RankingScreen() {
             <Text style={styles.retryButtonText}>再試行</Text>
           </TouchableOpacity>
         </View>
-      ) : rankings.length === 0 ? (
+      ) : visibleRankings.length === 0 ? (
         <View style={styles.centerContent}>
           <Text style={styles.emptyText}>まだランキングデータがありません</Text>
         </View>
       ) : (
         <FlatList
           style={styles.list}
-          data={rankings}
+          data={visibleRankings}
           keyExtractor={(item) => String(item.rank)}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
         />
+      )}
+
+      {/* 通報・非表示のアクションシート（横画面のため Modal ではなく画面内オーバーレイ） */}
+      {selectedEntry && (
+        <View style={styles.overlay}>
+          <TouchableOpacity
+            style={styles.overlayBackdrop}
+            activeOpacity={1}
+            onPress={() => { if (!reporting) setSelectedEntry(null); }}
+          />
+          <View style={styles.actionCard}>
+            <Text style={styles.actionTitle} numberOfLines={1}>{selectedEntry.user_name}</Text>
+            <Text style={styles.actionDesc}>不適切なアバター画像や名前ですか？</Text>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reportButton, reporting && styles.actionDisabled]}
+              onPress={() => handleReport(selectedEntry)}
+              disabled={reporting}
+            >
+              <Text style={styles.reportButtonText}>{reporting ? '送信中...' : '通報する'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.blockButton]}
+              onPress={() => handleBlock(selectedEntry)}
+              disabled={reporting}
+            >
+              <Text style={styles.blockButtonText}>非表示にする（ブロック）</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCancel}
+              onPress={() => setSelectedEntry(null)}
+              disabled={reporting}
+            >
+              <Text style={styles.actionCancelText}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -284,5 +373,77 @@ const styles = StyleSheet.create({
     width: 88,
     textAlign: 'right',
     paddingRight: 12,
+  },
+  moreIcon: {
+    color: '#666688',
+    fontSize: 20,
+    width: 24,
+    textAlign: 'center',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  overlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  actionCard: {
+    width: '70%',
+    maxWidth: 420,
+    backgroundColor: '#23233e',
+    borderRadius: 14,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#3a3a5e',
+  },
+  actionTitle: {
+    color: '#e0e0ff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  actionDesc: {
+    color: '#aaaacc',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  actionButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  actionDisabled: {
+    opacity: 0.5,
+  },
+  reportButton: {
+    backgroundColor: '#c0453b',
+  },
+  reportButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  blockButton: {
+    backgroundColor: '#2a2a4e',
+    borderWidth: 1,
+    borderColor: '#555577',
+  },
+  blockButtonText: {
+    color: '#e0e0ff',
+    fontSize: 15,
+  },
+  actionCancel: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  actionCancelText: {
+    color: '#8888aa',
+    fontSize: 14,
   },
 });
