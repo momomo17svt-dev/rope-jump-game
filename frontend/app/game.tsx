@@ -314,8 +314,8 @@ export default function GameScreen() {
   const playerFeetY = groundY - playerJumpYRef.current;
 
   return (
-    <Pressable style={styles.container} onPressIn={handleTap}>
-      <Svg width={W} height={H}>
+    <View style={styles.container}>
+      <Svg width={W} height={H} pointerEvents="none">
         {/* Ground line */}
         <Line x1={0} y1={groundY + 4} x2={W} y2={groundY + 4} stroke={GROUND} strokeWidth={3} />
 
@@ -360,7 +360,13 @@ export default function GameScreen() {
           <Text style={styles.countdownText}>{countdownLabel}</Text>
         </View>
       )}
-    </Pressable>
+
+      {/* タップ受け取り専用の最前面レイヤー。react-native-svg のルートビューが
+          タッチを横取りして onPressIn（ジャンプ）が発火しない問題（iOS 26 で顕在化、
+          審査リジェクトの原因）を避けるため、SVG は pointerEvents="none" にし、
+          全画面 Pressable を最前面に重ねてタップを確実に拾う。 */}
+      <Pressable style={StyleSheet.absoluteFill} onPressIn={handleTap} />
+    </View>
   );
 }
 
