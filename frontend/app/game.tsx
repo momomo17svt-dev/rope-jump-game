@@ -5,7 +5,6 @@ import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg'
 import { useGameSounds } from '../hooks/useGameSounds';
 import { getLocalUser } from '../db/database';
 import { resolveAvatarUri } from '../lib/avatar';
-import * as FileSystem from 'expo-file-system/legacy';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -179,38 +178,11 @@ export default function GameScreen() {
   const [, forceTick] = useState(0);
 
   useEffect(() => {
-    getLocalUser().then(async (user) => {
+    getLocalUser().then((user) => {
       if (user) {
-        const stand = resolveAvatarUri(user.avatar_stand_uri);
-        const jump = resolveAvatarUri(user.avatar_jump_uri);
-
-        let finalStand: string | null = null;
-        let finalJump: string | null = null;
-
-        if (stand) {
-          try {
-            const info = await FileSystem.getInfoAsync(stand);
-            if (info.exists) {
-              finalStand = stand;
-            }
-          } catch {
-            // エラー時はフォールバック
-          }
-        }
-
-        if (jump) {
-          try {
-            const info = await FileSystem.getInfoAsync(jump);
-            if (info.exists) {
-              finalJump = jump;
-            }
-          } catch {
-            // エラー時はフォールバック
-          }
-        }
-
-        setAvatarStandUri(finalStand);
-        setAvatarJumpUri(finalJump);
+        // 保存値は相対/旧絶対のどちらもあり得るため、現在のコンテナの絶対URIに解決する
+        setAvatarStandUri(resolveAvatarUri(user.avatar_stand_uri));
+        setAvatarJumpUri(resolveAvatarUri(user.avatar_jump_uri));
       }
     });
   }, []);
