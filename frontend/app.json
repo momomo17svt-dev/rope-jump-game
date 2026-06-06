@@ -2,7 +2,7 @@
   "expo": {
     "name": "大縄跳びサバイバル",
     "slug": "rope-jump-survival",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
