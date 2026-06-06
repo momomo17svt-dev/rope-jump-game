@@ -5,6 +5,7 @@ import Svg, { Path, Circle, Line, G, Image as SvgImage } from 'react-native-svg'
 import { useGameSounds } from '../hooks/useGameSounds';
 import { getLocalUser } from '../db/database';
 import { resolveAvatarUri } from '../lib/avatar';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const JUMP_HEIGHT = 50;
 const JUMP_DURATION = 200;
@@ -31,7 +32,7 @@ const PLAYER_IMG_H = 140;
 const PLAYER_IMG_JUMP_W = 168;
 const PLAYER_IMG_JUMP_H = 140;
 // カスタムアバターは正方形で表示
-const AVATAR_SIZE = 90;
+const AVATAR_SIZE = 140;
 
 const SKIN = '#fcd9b4';
 const HAIR = '#1a1a1a';
@@ -178,11 +179,38 @@ export default function GameScreen() {
   const [, forceTick] = useState(0);
 
   useEffect(() => {
-    getLocalUser().then((user) => {
+    getLocalUser().then(async (user) => {
       if (user) {
-        // 保存値は相対/旧絶対のどちらもあり得るため、現在のコンテナの絶対URIに解決する
-        setAvatarStandUri(resolveAvatarUri(user.avatar_stand_uri));
-        setAvatarJumpUri(resolveAvatarUri(user.avatar_jump_uri));
+        const stand = resolveAvatarUri(user.avatar_stand_uri);
+        const jump = resolveAvatarUri(user.avatar_jump_uri);
+
+        let finalStand: string | null = null;
+        let finalJump: string | null = null;
+
+        if (stand) {
+          try {
+            const info = await FileSystem.getInfoAsync(stand);
+            if (info.exists) {
+              finalStand = stand;
+            }
+          } catch {
+            // エラー時はフォールバック
+          }
+        }
+
+        if (jump) {
+          try {
+            const info = await FileSystem.getInfoAsync(jump);
+            if (info.exists) {
+              finalJump = jump;
+            }
+          } catch {
+            // エラー時はフォールバック
+          }
+        }
+
+        setAvatarStandUri(finalStand);
+        setAvatarJumpUri(finalJump);
       }
     });
   }, []);
@@ -337,7 +365,7 @@ export default function GameScreen() {
           y={avatarStandUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_H}
           width={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_W}
           height={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_H}
-          preserveAspectRatio="xMidYMax meet"
+          preserveAspectRatio="xMidYMid slice"
           opacity={jumpStartRef.current !== null ? 0 : 1}
         />
         <SvgImage
@@ -346,7 +374,7 @@ export default function GameScreen() {
           y={avatarJumpUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_JUMP_H}
           width={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_W}
           height={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_H}
-          preserveAspectRatio="xMidYMax meet"
+          preserveAspectRatio="xMidYMid slice"
           opacity={jumpStartRef.current !== null ? 1 : 0}
         />
       </Svg>

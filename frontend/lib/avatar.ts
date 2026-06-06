@@ -18,7 +18,18 @@ const THUMB_SIZE = 64;
 export function resolveAvatarUri(stored: string | null | undefined): string | null {
   if (!stored) return null;
   const i = stored.indexOf('avatars/');
-  const rel = i >= 0 ? stored.slice(i) : stored;
+  let rel = stored;
+  if (i >= 0) {
+    rel = stored.slice(i);
+  } else {
+    // avatars/ が含まれない場合（ファイル名のみ、あるいは古い絶対パスなど）、
+    // 末尾のファイル名部分のみを切り出して 'avatars/' を付与する
+    const parts = stored.split('/');
+    const filename = parts[parts.length - 1];
+    if (filename) {
+      rel = 'avatars/' + filename;
+    }
+  }
   return (FileSystem.documentDirectory ?? '') + rel;
 }
 
@@ -26,7 +37,13 @@ export function resolveAvatarUri(stored: string | null | undefined): string | nu
 export function toRelativeAvatarPath(uri: string | null | undefined): string | null {
   if (!uri) return null;
   const i = uri.indexOf('avatars/');
-  return i >= 0 ? uri.slice(i) : uri;
+  if (i >= 0) {
+    return uri.slice(i);
+  }
+  // avatars/ が含まれない場合もファイル名から相対パスを作成
+  const parts = uri.split('/');
+  const filename = parts[parts.length - 1];
+  return filename ? 'avatars/' + filename : null;
 }
 
 // 画像を中央の正方形にクロップして新しいURIを返す。

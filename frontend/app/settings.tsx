@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, LayoutAnimation, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -45,6 +45,21 @@ export default function SettingsScreen() {
   // 設定画面はメニュー一覧（'menu'）と各詳細を同一画面内で切り替える。
   // 横画面固定アプリのため Modal は使わず条件レンダリングで実装している。
   const [page, setPage] = useState<'menu' | 'profile' | 'character' | 'purchase' | 'about'>('menu');
+
+  const createdUrisRef = useRef<string[]>([]);
+  const isSavedRef = useRef(false);
+
+  // アンマウント時やキャンセル時のクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (!isSavedRef.current) {
+        // 保存されなかった場合は、このセッションで生成されたアバターファイルを全て削除する
+        createdUrisRef.current.forEach((uri) => {
+          FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        });
+      }
+    };
+  }, []);
 
   const openSection = (key: 'profile' | 'character' | 'purchase' | 'about') => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -96,13 +111,11 @@ export default function SettingsScreen() {
     const dir = FileSystem.documentDirectory + 'avatars/';
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
 
-    const prevUri = type === 'stand' ? standUri : jumpUri;
-    if (prevUri?.startsWith(dir)) {
-      await FileSystem.deleteAsync(prevUri, { idempotent: true });
-    }
-
     const dest = dir + `${type}_${Date.now()}.jpg`;
     await FileSystem.copyAsync({ from: srcUri, to: dest });
+
+    // 新しく作成されたファイルの追跡
+    createdUrisRef.current.push(dest);
 
     if (type === 'stand') setStandUri(dest);
     else setJumpUri(dest);
@@ -133,10 +146,10 @@ export default function SettingsScreen() {
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       const dest = dir + `${type}_nobg_${Date.now()}.png`;
       await FileSystem.copyAsync({ from: resultUri, to: dest });
-      // 直前のファイルが自前ディレクトリのものなら削除して溜め込まない
-      if (uri.startsWith(dir)) {
-        await FileSystem.deleteAsync(uri, { idempotent: true });
-      }
+      
+      // 新しく作成されたファイルの追跡
+      createdUrisRef.current.push(dest);
+
       if (type === 'stand') setStandUri(dest);
       else setJumpUri(dest);
     } catch (e: any) {
@@ -246,6 +259,10 @@ export default function SettingsScreen() {
     setSaving(true);
     try {
       const user = await getLocalUser();
+      
+      // 保存前の古いアバターファイルのパスを保持しておく
+      const oldStand = user ? resolveAvatarUri(user.avatar_stand_uri) : null;
+      const oldJump = user ? resolveAvatarUri(user.avatar_jump_uri) : null;
 
       // 名前が変わっている場合のみサーバーで重複チェック
       if (user && trimmed !== user.user_name) {
@@ -281,6 +298,23 @@ export default function SettingsScreen() {
           body: JSON.stringify({ device_id: user.device_id, user_name: trimmed, avatar: thumb }),
         }).catch(() => {});
       }
+
+      isSavedRef.current = true; // クリーンアップ対象から外す
+
+      // 古いアバターファイルの削除（新しく設定した画像と異なる場合のみ）
+      if (oldStand && oldStand !== standUri) {
+        await FileSystem.deleteAsync(oldStand, { idempotent: true }).catch(() => {});
+      }
+      if (oldJump && oldJump !== jumpUri) {
+        await FileSystem.deleteAsync(oldJump, { idempotent: true }).catch(() => {});
+      }
+
+      // 設定セッション中に作成したが、最終的に保存されなかった画像を削除
+      createdUrisRef.current.forEach((uri) => {
+        if (uri !== standUri && uri !== jumpUri) {
+          FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        }
+      });
 
       setSuccessMsg('保存しました');
       setTimeout(() => {
