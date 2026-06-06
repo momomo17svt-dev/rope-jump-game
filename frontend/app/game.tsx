@@ -172,6 +172,7 @@ export default function GameScreen() {
 
   const [avatarStandUri, setAvatarStandUri] = useState<string | null>(null);
   const [avatarJumpUri, setAvatarJumpUri] = useState<string | null>(null);
+  const [isAvatarLoaded, setIsAvatarLoaded] = useState(false);
   const [gameState, setGameState] = useState<GameState>('countdown');
   const [countdownLabel, setCountdownLabel] = useState<string>('3');
   const [score, setScore] = useState(0);
@@ -184,6 +185,9 @@ export default function GameScreen() {
         setAvatarStandUri(resolveAvatarUri(user.avatar_stand_uri));
         setAvatarJumpUri(resolveAvatarUri(user.avatar_jump_uri));
       }
+      setIsAvatarLoaded(true);
+    }).catch(() => {
+      setIsAvatarLoaded(true);
     });
   }, []);
 
@@ -199,6 +203,7 @@ export default function GameScreen() {
   const navigatedRef = useRef(false);
 
   useEffect(() => {
+    if (!isAvatarLoaded) return;
     if (gameState !== 'countdown') return;
     const start = Date.now();
     const interval = setInterval(() => {
@@ -214,7 +219,7 @@ export default function GameScreen() {
       }
     }, 50);
     return () => clearInterval(interval);
-  }, [gameState]);
+  }, [gameState, isAvatarLoaded]);
 
   useEffect(() => {
     if (gameState !== 'playing') return;
