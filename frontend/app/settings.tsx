@@ -139,10 +139,11 @@ export default function SettingsScreen() {
     }
     setRemovingBg(type);
     try {
-      // trim:false で元のフレーム（アスペクト比）を保つ（trueだと被写体に合わせて
-      // 切り詰められて縦横比が変わるため）。被写体が無い画像はライブラリがエラーを
-      // 投げるので、その場合は元画像を維持する。表示は contain/meet で枠に収める。
-      const resultUri = await removeBackground(uri, { trim: false });
+      // trim:true で被写体の周囲の透明余白を切り詰める。被写体の足が画像の下端に
+      // 来るので、ゲーム内で下揃え表示（xMidYMax meet）すると浮かずに接地する。
+      // 表示は meet（アスペクト比保持）なのでトリミングで歪むことはない。
+      // 被写体が無い画像はライブラリがエラーを投げるので、その場合は元画像を維持する。
+      const resultUri = await removeBackground(uri, { trim: true });
       const dir = FileSystem.documentDirectory + 'avatars/';
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       const dest = dir + `${type}_nobg_${Date.now()}.png`;
