@@ -2,14 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/Tatsunobu-Eto/rope-jump-game/backend/db"
@@ -19,13 +24,23 @@ import (
 const (
 	maxDeviceIDLen   = 64
 	maxUserNameRunes = 12
-	maxScore         = 1_000_000
-	maxReasonLen     = 200
-	rankingLimit     = 100
-	// アバターは 64x64 JPEG の base64。通常数KBだが余裕を持って上限を設定する。
-	maxAvatarBytes = 64 * 1024
+	// 現在のゲームは最速でも1スコア約220ms。10,000点でも約37分かかるため、
+	// API直叩きによる非現実的なランキング汚染を抑える現実的な上限にする。
+	maxScore     = 10_000
+	maxReasonLen = 200
+	rankingLimit = 100
+	// アバターは 64x64 PNG/JPEG の base64。通常数KBだが余裕を持って上限を設定する。
+	maxAvatarBase64Len = 64 * 1024
 	// アバター base64 が乗るのでリクエストボディ上限を引き上げる。
 	maxRequestBytes = 128 * 1024
+)
+
+var (
+	readIPLimiter      = newRateLimiter(240, time.Minute)
+	writeIPLimiter     = newRateLimiter(120, time.Minute)
+	scoreRateLimiter   = newRateLimiter(20, time.Minute)
+	reportRateLimiter  = newRateLimiter(10, time.Minute)
+	profileRateLimiter = newRateLimiter(20, time.Minute)
 )
 
 func main() {
@@ -128,6 +143,9 @@ type postScoreRequest struct {
 
 func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, writeIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -139,6 +157,17 @@ func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if msg := validateScoreRequest(req); msg != "" {
 			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
+		if !allowRequest(w, scoreRateLimiter, "score:"+req.DeviceID) {
+			return
+		}
+		if taken, err := db.IsUserNameTaken(r.Context(), pool, req.UserName, req.DeviceID); err != nil {
+			log.Printf("score username check error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		} else if taken {
+			writeError(w, http.StatusConflict, "user_name taken")
 			return
 		}
 
@@ -155,17 +184,16 @@ func postScoreHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func validateScoreRequest(req postScoreRequest) string {
-	if req.DeviceID == "" || len(req.DeviceID) > maxDeviceIDLen {
+	if !isValidDeviceID(req.DeviceID) {
 		return "invalid device_id"
 	}
-	nameLen := utf8.RuneCountInString(req.UserName)
-	if nameLen < 1 || nameLen > maxUserNameRunes {
+	if !isValidUserName(req.UserName) {
 		return "invalid user_name"
 	}
 	if req.Score < 0 || req.Score > maxScore {
 		return "invalid score"
 	}
-	if req.Avatar != nil && len(*req.Avatar) > maxAvatarBytes {
+	if !isValidAvatar(req.Avatar) {
 		return "invalid avatar"
 	}
 	return ""
@@ -179,6 +207,9 @@ type patchProfileRequest struct {
 
 func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, writeIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -188,16 +219,27 @@ func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid json")
 			return
 		}
-		if req.DeviceID == "" || len(req.DeviceID) > maxDeviceIDLen {
+		if !isValidDeviceID(req.DeviceID) {
 			writeError(w, http.StatusBadRequest, "invalid device_id")
 			return
 		}
-		if nameLen := utf8.RuneCountInString(req.UserName); nameLen < 1 || nameLen > maxUserNameRunes {
+		if !isValidUserName(req.UserName) {
 			writeError(w, http.StatusBadRequest, "invalid user_name")
 			return
 		}
-		if req.Avatar != nil && len(*req.Avatar) > maxAvatarBytes {
+		if !isValidAvatar(req.Avatar) {
 			writeError(w, http.StatusBadRequest, "invalid avatar")
+			return
+		}
+		if !allowRequest(w, profileRateLimiter, "profile:"+req.DeviceID) {
+			return
+		}
+		if taken, err := db.IsUserNameTaken(r.Context(), pool, req.UserName, req.DeviceID); err != nil {
+			log.Printf("profile username check error: %v", err)
+			writeError(w, http.StatusInternalServerError, "server error")
+			return
+		} else if taken {
+			writeError(w, http.StatusConflict, "user_name taken")
 			return
 		}
 		if err := db.UpdateProfile(r.Context(), pool, req.DeviceID, req.UserName, req.Avatar); err != nil {
@@ -211,9 +253,15 @@ func patchProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 func deleteProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, writeIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		deviceID := r.URL.Query().Get("device_id")
-		if deviceID == "" || len(deviceID) > maxDeviceIDLen {
+		if !isValidDeviceID(deviceID) {
 			writeError(w, http.StatusBadRequest, "invalid device_id")
+			return
+		}
+		if !allowRequest(w, profileRateLimiter, "profile:"+deviceID) {
 			return
 		}
 		if err := db.DeleteProfile(r.Context(), pool, deviceID); err != nil {
@@ -233,6 +281,9 @@ type reportRequest struct {
 
 func postReportHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, writeIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		dec := json.NewDecoder(r.Body)
 		dec.DisallowUnknownFields()
@@ -246,12 +297,19 @@ func postReportHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid reported_user_name")
 			return
 		}
-		if len(req.ReporterDeviceID) > maxDeviceIDLen {
+		if req.ReporterDeviceID != "" && !isValidDeviceID(req.ReporterDeviceID) {
 			writeError(w, http.StatusBadRequest, "invalid reporter_device_id")
 			return
 		}
 		if utf8.RuneCountInString(req.Reason) > maxReasonLen {
 			writeError(w, http.StatusBadRequest, "invalid reason")
+			return
+		}
+		reportKey := "report-ip:" + clientIP(r)
+		if req.ReporterDeviceID != "" {
+			reportKey = "report:" + req.ReporterDeviceID
+		}
+		if !allowRequest(w, reportRateLimiter, reportKey) {
 			return
 		}
 		if err := db.InsertReport(r.Context(), pool, req.ReporterDeviceID, req.ReportedUserName, req.Reason); err != nil {
@@ -265,10 +323,17 @@ func postReportHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 func checkUsernameHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, readIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		name := r.URL.Query().Get("name")
 		deviceID := r.URL.Query().Get("device_id")
-		if utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > maxUserNameRunes {
+		if !isValidUserName(name) {
 			writeError(w, http.StatusBadRequest, "invalid name")
+			return
+		}
+		if deviceID != "" && !isValidDeviceID(deviceID) {
+			writeError(w, http.StatusBadRequest, "invalid device_id")
 			return
 		}
 		taken, err := db.IsUserNameTaken(r.Context(), pool, name, deviceID)
@@ -284,6 +349,9 @@ func checkUsernameHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 func getRankingsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !allowRequest(w, readIPLimiter, "ip:"+clientIP(r)) {
+			return
+		}
 		var (
 			rankings []db.Ranking
 			err      error
@@ -307,6 +375,168 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+type rateBucket struct {
+	start time.Time
+	count int
+}
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	limit   int
+	window  time.Duration
+	buckets map[string]rateBucket
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{
+		limit:   limit,
+		window:  window,
+		buckets: make(map[string]rateBucket),
+	}
+}
+
+func (l *rateLimiter) Allow(key string) bool {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	bucket := l.buckets[key]
+	if bucket.start.IsZero() || now.Sub(bucket.start) >= l.window {
+		l.buckets[key] = rateBucket{start: now, count: 1}
+		l.cleanupLocked(now)
+		return true
+	}
+	if bucket.count >= l.limit {
+		return false
+	}
+	bucket.count++
+	l.buckets[key] = bucket
+	return true
+}
+
+func (l *rateLimiter) cleanupLocked(now time.Time) {
+	for key, bucket := range l.buckets {
+		if now.Sub(bucket.start) >= l.window*2 {
+			delete(l.buckets, key)
+		}
+	}
+}
+
+func allowRequest(w http.ResponseWriter, limiter *rateLimiter, key string) bool {
+	if limiter.Allow(key) {
+		return true
+	}
+	writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+	return false
+}
+
+func clientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		if ip := strings.TrimSpace(strings.Split(forwarded, ",")[0]); ip != "" {
+			return ip
+		}
+	}
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		return realIP
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+func isValidDeviceID(s string) bool {
+	if len(s) != 36 || len(s) > maxDeviceIDLen {
+		return false
+	}
+	for i, r := range s {
+		switch i {
+		case 8, 13, 18, 23:
+			if r != '-' {
+				return false
+			}
+		default:
+			if !isHex(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isHex(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+}
+
+func isValidUserName(name string) bool {
+	n := utf8.RuneCountInString(name)
+	return n >= 1 && n <= maxUserNameRunes && isNameAllowed(name)
+}
+
+func isNameAllowed(name string) bool {
+	normalized := normalizeName(name)
+	if normalized == "" {
+		return false
+	}
+	for _, banned := range bannedNameSubstrings {
+		if strings.Contains(normalized, banned) {
+			return false
+		}
+	}
+	return true
+}
+
+func normalizeName(name string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+var bannedNameSubstrings = []string{
+	"fuck", "shit", "bitch", "cunt", "asshole", "nigger", "faggot", "rape", "porn", "sex",
+	"しね", "死ね", "ころす", "殺す", "きえろ", "ばか", "あほ", "うんこ", "ちんこ", "まんこ",
+	"せっくす", "ふぁっく", "きちがい", "ぶっころ",
+}
+
+func isValidAvatar(avatar *string) bool {
+	if avatar == nil {
+		return true
+	}
+	if *avatar == "" || len(*avatar) > maxAvatarBase64Len {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(*avatar)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(*avatar)
+	}
+	if err != nil || len(decoded) < 8 {
+		return false
+	}
+	return isPNG(decoded) || isJPEG(decoded)
+}
+
+func isPNG(b []byte) bool {
+	return len(b) >= 8 &&
+		b[0] == 0x89 &&
+		b[1] == 'P' &&
+		b[2] == 'N' &&
+		b[3] == 'G' &&
+		b[4] == '\r' &&
+		b[5] == '\n' &&
+		b[6] == 0x1a &&
+		b[7] == '\n'
+}
+
+func isJPEG(b []byte) bool {
+	return len(b) >= 3 && b[0] == 0xff && b[1] == 0xd8 && b[2] == 0xff
 }
 
 func withLogging(next http.Handler) http.Handler {

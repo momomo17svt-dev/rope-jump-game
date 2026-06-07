@@ -40,11 +40,29 @@ WHERE id NOT IN (
 );
 `
 
+// 重複 user_name を除去（クライアント仕様ではユーザー名は一意。直叩き等で入った重複を整理する）
+const deduplicateUserNameSQL = `
+DELETE FROM global_rankings
+WHERE id NOT IN (
+    SELECT DISTINCT ON (user_name) id
+    FROM global_rankings
+    ORDER BY user_name, score DESC, created_at ASC
+);
+`
+
 // UNIQUE 制約が未存在なら追加（42P07 = duplicate_table はインデックス重複時のエラーコード）
 const addUniqueSQL = `
 DO $$ BEGIN
     ALTER TABLE global_rankings
         ADD CONSTRAINT global_rankings_device_id_key UNIQUE (device_id);
+EXCEPTION WHEN duplicate_table OR duplicate_object OR SQLSTATE '42P07' THEN NULL;
+END $$;
+`
+
+const addUserNameUniqueSQL = `
+DO $$ BEGIN
+    ALTER TABLE global_rankings
+        ADD CONSTRAINT global_rankings_user_name_key UNIQUE (user_name);
 EXCEPTION WHEN duplicate_table OR duplicate_object OR SQLSTATE '42P07' THEN NULL;
 END $$;
 `
@@ -74,7 +92,16 @@ CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports (created_at DESC);
 `
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	for _, sql := range []string{createTableSQL, deduplicateSQL, addUniqueSQL, addLastPlayedAtSQL, addAvatarSQL, createReportsSQL} {
+	for _, sql := range []string{
+		createTableSQL,
+		deduplicateSQL,
+		deduplicateUserNameSQL,
+		addUniqueSQL,
+		addUserNameUniqueSQL,
+		addLastPlayedAtSQL,
+		addAvatarSQL,
+		createReportsSQL,
+	} {
 		if _, err := pool.Exec(ctx, sql); err != nil {
 			return err
 		}
