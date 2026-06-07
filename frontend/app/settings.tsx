@@ -10,7 +10,7 @@ import Purchases from '@/lib/purchasessafe';
 import { ensurePurchasesConfigured, hasActiveEntitlement } from '@/lib/purchases';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
-import { makeAvatarThumb, cropCenterSquare, resolveAvatarUri, toRelativeAvatarPath } from '@/lib/avatar';
+import { makeAvatarThumb, normalizeImage, resolveAvatarUri, toRelativeAvatarPath } from '@/lib/avatar';
 import { isNameAllowed } from '@/lib/nameFilter';
 import removeBackground from '@/lib/bgremoversafe';
 import { APP_ICON, CREDITS, CREDITS_INTRO } from '@/lib/credits';
@@ -97,8 +97,9 @@ export default function SettingsScreen() {
     }
 
     // allowsEditing は使わない。iPhone では縦専用の UIImagePickerController クロップ画面が
-    // 開いて横画面が一瞬縦に回ってしまうため。横対応の PHPicker で選び、正方形クロップは
-    // 選択後に cropCenterSquare（expo-image-manipulator）でアプリ側から行う。
+    // 開いて横画面が一瞬縦に回ってしまうため。横対応の PHPicker で選ぶ。
+    // クロップはしない（正方形に切ると頭/足が切れるため）。選択後は normalizeImage で
+    // アスペクト比を保ったまま縮小・JPEG化し、表示側（contain/meet）で枠に収める。
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
@@ -107,7 +108,7 @@ export default function SettingsScreen() {
     if (result.canceled) return;
 
     const asset = result.assets[0];
-    const srcUri = await cropCenterSquare(asset.uri, asset.width, asset.height);
+    const srcUri = await normalizeImage(asset.uri, asset.width, asset.height);
     const dir = FileSystem.documentDirectory + 'avatars/';
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
 
@@ -138,9 +139,9 @@ export default function SettingsScreen() {
     }
     setRemovingBg(type);
     try {
-      // trim:false で元の正方形フレームを保つ（trueだと被写体に合わせて切り詰められ
-      // 縦横比が崩れ、正方形スロットで歪むため）。被写体が無い画像はライブラリが
-      // エラーを投げるので、その場合は元画像を維持する。
+      // trim:false で元のフレーム（アスペクト比）を保つ（trueだと被写体に合わせて
+      // 切り詰められて縦横比が変わるため）。被写体が無い画像はライブラリがエラーを
+      // 投げるので、その場合は元画像を維持する。表示は contain/meet で枠に収める。
       const resultUri = await removeBackground(uri, { trim: false });
       const dir = FileSystem.documentDirectory + 'avatars/';
       await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
@@ -702,7 +703,8 @@ const styles = StyleSheet.create({
   avatarPreview: {
     width: 90,
     height: 90,
-    resizeMode: 'cover',
+    // 切り抜かず全体を表示（ゲーム内の meet と揃える）。頭/足が切れないようにする。
+    resizeMode: 'contain',
   },
   avatarButtons: {
     gap: 10,

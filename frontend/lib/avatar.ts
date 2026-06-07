@@ -46,6 +46,34 @@ export function toRelativeAvatarPath(uri: string | null | undefined): string | n
   return filename ? 'avatars/' + filename : null;
 }
 
+// 画像を「切り抜かず」アスペクト比を保ったまま正規化（長辺を maxSize に収め JPEG 化）する。
+// 正方形クロップだと縦長写真の頭（上）や足（下）が切れてしまうため、アバターは
+// クロップせず全体を保持し、表示側（contain / meet）で枠に収める方針にする。
+// JPEG 化は HEIC など端末依存フォーマットを描画互換のある形に揃える目的も兼ねる。
+export async function normalizeImage(
+  uri: string,
+  width?: number,
+  height?: number,
+  maxSize = 512
+): Promise<string> {
+  try {
+    const ctx = ImageManipulator.manipulate(uri);
+    if (width && height) {
+      const longest = Math.max(width, height);
+      if (longest > maxSize) {
+        const scale = maxSize / longest;
+        ctx.resize({ width: Math.round(width * scale), height: Math.round(height * scale) });
+      }
+    }
+    const image = await ctx.renderAsync();
+    const result = await image.saveAsync({ compress: 0.9, format: SaveFormat.JPEG });
+    return result.uri;
+  } catch {
+    // 失敗してもアプリ動作は止めない（元URIをそのまま使う）
+    return uri;
+  }
+}
+
 // 画像を中央の正方形にクロップして新しいURIを返す。
 // 横画面を保つため allowsEditing（iPhoneでは縦専用のクロップUI）を使わず、
 // 選択後にこの関数でアプリ側から正方形に切り抜く用途。
