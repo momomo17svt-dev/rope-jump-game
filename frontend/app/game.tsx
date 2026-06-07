@@ -342,7 +342,9 @@ export default function GameScreen() {
           y={avatarStandUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_H}
           width={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_W}
           height={avatarStandUri ? AVATAR_SIZE : PLAYER_IMG_H}
-          preserveAspectRatio="xMidYMid slice"
+          // カスタム画像は全体表示（meet＝設定プレビューと一致、頭/足が切れない）。
+          // 既定絵はこれまで通り slice（枠ぴったりに描く想定の自前アセット）。
+          preserveAspectRatio={avatarStandUri ? 'xMidYMid meet' : 'xMidYMid slice'}
           opacity={jumpStartRef.current !== null ? 0 : 1}
         />
         <SvgImage
@@ -351,7 +353,7 @@ export default function GameScreen() {
           y={avatarJumpUri ? playerFeetY - AVATAR_SIZE : playerFeetY - PLAYER_IMG_JUMP_H}
           width={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_W}
           height={avatarJumpUri ? AVATAR_SIZE : PLAYER_IMG_JUMP_H}
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio={avatarJumpUri ? 'xMidYMid meet' : 'xMidYMid slice'}
           opacity={jumpStartRef.current !== null ? 1 : 0}
         />
       </Svg>
