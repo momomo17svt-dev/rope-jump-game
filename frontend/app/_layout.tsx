@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Stack, useSegments } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { requestTrackingPermission } from '@/lib/tracking';
+import { initializeAds } from '@/lib/adsafe';
 import { AdProvider } from '@/context/AdContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useTopBGM } from '@/hooks/useTopBGM';
@@ -50,10 +51,15 @@ export default function RootLayout() {
     // ScreenOrientation でロックして横を維持する（製品版は Info.plist で固定済み）。
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
 
-    // 広告（IDFA）利用のため App Tracking Transparency の許可を要求する。
+    // 広告（IDFA）利用のため App Tracking Transparency の許可を要求し、
+    // ATT の確定後に Google Mobile Ads SDK を初期化する。
     // ・RevenueCat の configure / 購入状態同期は AdProvider 側で実施。
-    // ・AdMob は本番広告ID未設定時は描画されず、初回広告表示時に遅延初期化される。
-    requestTrackingPermission();
+    // ・initialize() を呼ばないとバナー/インタースティシャルが load されない。
+    //   ATT 確定後に初期化することで IDFA の利用可否が広告リクエストへ正しく反映される。
+    (async () => {
+      await requestTrackingPermission();
+      await initializeAds();
+    })();
   }, []);
 
   return (
