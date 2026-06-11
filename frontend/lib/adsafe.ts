@@ -30,6 +30,17 @@ export async function initializeAds(): Promise<void> {
   }
 }
 
+export async function openAdInspector(): Promise<boolean> {
+  if (!mobileAdsRaw) return false;
+  try {
+    await mobileAdsRaw().openAdInspector();
+    return true;
+  } catch (e) {
+    console.log('[Ads] openAdInspector failed', e);
+    return false;
+  }
+}
+
 const stubInterstitial = () => ({
   isLoaded: false,
   load: () => {},
