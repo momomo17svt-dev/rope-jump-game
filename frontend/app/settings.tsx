@@ -10,6 +10,7 @@ import Purchases from '@/lib/purchasessafe';
 import { ensurePurchasesConfigured, hasActiveEntitlement } from '@/lib/purchases';
 import { useAd } from '@/context/AdContext';
 import { API_BASE } from '@/lib/api';
+import { openAdInspector } from '@/lib/adsafe';
 import { makeAvatarThumb, normalizeImage, resolveAvatarUri, toRelativeAvatarPath } from '@/lib/avatar';
 import { isNameAllowed } from '@/lib/nameFilter';
 import removeBackground from '@/lib/bgremoversafe';
@@ -243,6 +244,13 @@ export default function SettingsScreen() {
       Alert.alert('エラー', '復元に失敗しました');
     } finally {
       setPurchasing(false);
+    }
+  };
+
+  const handleOpenAdInspector = async () => {
+    const opened = await openAdInspector();
+    if (!opened) {
+      Alert.alert('広告診断を開けません', 'AdMob SDKが有効なTestFlight/製品版ビルドでお試しください。');
     }
   };
 
@@ -564,7 +572,9 @@ export default function SettingsScreen() {
           <View style={styles.appHeader}>
             <Image source={APP_ICON} style={styles.appIcon} resizeMode="contain" />
             <Text style={styles.appName}>大縄跳びサバイバル</Text>
-            <Text style={styles.appVersionSmall}>v{APP_VERSION}</Text>
+            <TouchableOpacity onLongPress={handleOpenAdInspector} delayLongPress={900}>
+              <Text style={styles.appVersionSmall}>v{APP_VERSION}</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.linkRow} onPress={() => openURL(REVIEW_URL)}>

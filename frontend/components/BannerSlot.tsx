@@ -1,11 +1,11 @@
 import { View, useWindowDimensions, StyleSheet } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from '@/lib/adsafe';
-import { ADMOB_IOS_BANNER_ID } from '@/lib/adsConfig';
+import { ADMOB_IOS_BANNER_ID, resolveAdMobUnitId } from '@/lib/adsConfig';
 
 // 開発時はテストID、本番は committed な本番ユニットID（env があれば優先）。
 const BANNER_ID = __DEV__
   ? TestIds.BANNER
-  : (process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID || ADMOB_IOS_BANNER_ID);
+  : resolveAdMobUnitId(process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID, ADMOB_IOS_BANNER_ID);
 
 /**
  * 下部に広告枠を「あらかじめ確保」する再利用コンポーネント。

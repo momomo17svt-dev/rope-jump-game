@@ -39,6 +39,9 @@ export function AdProvider({ children }: { children: ReactNode }) {
         if (purchased === true && !removed) {
           await dbSetAdRemoved(true);
           setAdRemoved(true);
+        } else if (purchased === false && removed) {
+          await dbSetAdRemoved(false);
+          setAdRemoved(false);
         }
       } catch (e) {
         // DB初期化に失敗しても起動を止めない（広告非削除の既定で続行）
